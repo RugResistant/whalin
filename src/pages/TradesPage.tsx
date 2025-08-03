@@ -1,3 +1,4 @@
+// src/pages/TradesPage.tsx
 import { useTrades } from '@/hooks/useData';
 import { format } from 'date-fns';
 import {
@@ -6,34 +7,54 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table';
+import { cn } from '@/lib/utils';
 
-function TradesPage() {
+type TradeRow = {
+  token_mint: string;
+  enriched?: {
+    name?: string;
+    symbol?: string;
+  };
+  buy_price?: number;
+  buy_timestamp?: string;
+  sell_price?: number;
+  sell_timestamp?: string;
+  price_change_percent?: number;
+  estimated_profit_sol?: number;
+};
+
+export default function TradesPage() {
   const { data = [], isLoading, error } = useTrades();
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<TradeRow>[] = [
     {
       accessorKey: 'token_mint',
       header: '🧬 Token Mint',
-      cell: ({ getValue }) => (
-        <a
-          href={`/insights/${getValue<string>()}`}
-          className="link link-primary break-all"
-        >
-          {getValue<string>()}
-        </a>
-      ),
+      cell: ({ getValue }) => {
+        const mint = getValue<string>();
+        return (
+          <a
+            href={`/insights/${mint}`}
+            className="link link-primary break-words text-xs"
+          >
+            {mint}
+          </a>
+        );
+      },
     },
     {
       accessorFn: (row) => row.enriched?.name ?? 'Unknown',
+      id: 'name',
       header: 'Name',
     },
     {
       accessorFn: (row) => row.enriched?.symbol ?? '—',
+      id: 'symbol',
       header: 'Symbol',
     },
     {
       accessorKey: 'buy_price',
-      header: 'Buy Price (SOL)',
+      header: 'Buy (◎)',
       cell: ({ getValue }) => {
         const val = Number(getValue());
         return val > 0 ? `${val.toFixed(6)}◎` : '—';
@@ -47,7 +68,7 @@ function TradesPage() {
     },
     {
       accessorKey: 'sell_price',
-      header: 'Sell Price (SOL)',
+      header: 'Sell (◎)',
       cell: ({ getValue }) => {
         const val = Number(getValue());
         return val > 0 ? `${val.toFixed(6)}◎` : '—';
@@ -61,13 +82,13 @@ function TradesPage() {
     },
     {
       accessorKey: 'price_change_percent',
-      header: 'Change (%)',
+      header: 'Δ (%)',
       cell: ({ getValue }) =>
         getValue() ? `${Number(getValue()).toFixed(2)}%` : '—',
     },
     {
       accessorKey: 'estimated_profit_sol',
-      header: 'Profit (SOL)',
+      header: 'PnL (◎)',
       cell: ({ getValue }) => {
         const val = Number(getValue());
         return val ? `${val.toFixed(6)}◎` : '—';
@@ -86,16 +107,18 @@ function TradesPage() {
       <h1 className="text-3xl font-bold">💸 Trade History</h1>
 
       {isLoading && <div className="loading loading-spinner text-primary" />}
-      {error && <div className="alert alert-error">Failed to load trades.</div>}
+      {error && (
+        <div className="alert alert-error">Failed to load trades.</div>
+      )}
 
       {!isLoading && !error && (
-        <div className="overflow-x-auto rounded-lg border border-base-300">
-          <table className="table table-zebra table-sm w-full">
-            <thead className="bg-base-300 text-sm">
+        <div className="overflow-x-auto rounded-lg border border-base-300 shadow">
+          <table className="table table-sm table-zebra w-full text-sm">
+            <thead className="bg-base-200">
               {table.getHeaderGroups().map((group) => (
                 <tr key={group.id}>
                   {group.headers.map((header) => (
-                    <th key={header.id}>
+                    <th key={header.id} className="whitespace-nowrap">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -111,7 +134,7 @@ function TradesPage() {
               {table.getRowModel().rows.map((row) => (
                 <tr key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id}>
+                    <td key={cell.id} className="whitespace-nowrap">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -127,5 +150,3 @@ function TradesPage() {
     </div>
   );
 }
-
-export default TradesPage;
