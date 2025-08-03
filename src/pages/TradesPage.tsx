@@ -86,8 +86,16 @@ function TradesPage() {
     {
       accessorKey: 'price_change_percent',
       header: 'Change (%)',
-      cell: ({ getValue }) =>
-        getValue() ? `${Number(getValue()).toFixed(2)}%` : '—',
+      cell: ({ getValue }) => {
+        const change = Number(getValue());
+        const emoji = change > 0 ? '🚀' : change < 0 ? '💀' : '';
+        const color = change > 0 ? 'text-green-500' : change < 0 ? 'text-red-500' : 'text-base-content';
+        return (
+          <span className={color}>
+            {emoji} {isNaN(change) ? '—' : `${change.toFixed(2)}%`}
+          </span>
+        );
+      },
     },
     {
       accessorKey: 'estimated_profit_sol',
@@ -95,7 +103,13 @@ function TradesPage() {
       cell: ({ getValue }) => {
         const sol = Number(getValue()) || 0;
         const usd = sol * solPrice;
-        return usd !== 0 ? `$${usd.toFixed(6)}` : '—';
+        const emoji = usd > 0 ? '🟢' : usd < 0 ? '🔴' : '';
+        const color = usd > 0 ? 'text-green-500' : usd < 0 ? 'text-red-500' : 'text-base-content';
+        return (
+          <span className={color}>
+            {emoji} {usd !== 0 ? `$${usd.toFixed(6)}` : '—'}
+          </span>
+        );
       },
     },
   ];
