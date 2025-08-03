@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 const MORALIS_API_KEY = import.meta.env.VITE_MORALIS_API_KEY;
 export interface TokenInsights {
   name?: string;
