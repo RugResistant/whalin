@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+
 const MORALIS_API_KEY = import.meta.env.VITE_MORALIS_API_KEY;
+
 export interface TokenInsights {
   name?: string;
   symbol?: string;
@@ -14,6 +16,7 @@ export interface TokenInsights {
   logs?: any[];
   pairAddress?: string;
 }
+
 export function useTokenInsights(tokenMint: string) {
   return useQuery<TokenInsights>({
     queryKey: ['token-insights', tokenMint],
@@ -21,37 +24,54 @@ export function useTokenInsights(tokenMint: string) {
       if (!tokenMint || tokenMint.length < 32) {
         throw new Error(`Invalid tokenMint: ${tokenMint}`);
       }
+
       const headers = {
         accept: 'application/json',
         'X-API-Key': MORALIS_API_KEY!,
       };
+
       // Fetch metadata
-      const metaRes = await fetch(`https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/metadata`, { headers });
+      const metaRes = await fetch(
+        `https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/metadata`,
+        { headers }
+      );
       if (!metaRes.ok) {
         const error = await metaRes.json().catch(() => ({}));
         throw new Error(`Moralis metadata error: ${error.message || metaRes.status}`);
       }
       const meta = await metaRes.json();
+
       // Fetch price
-      const priceRes = await fetch(`https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/price`, { headers });
+      const priceRes = await fetch(
+        `https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/price`,
+        { headers }
+      );
       if (!priceRes.ok) {
         const error = await priceRes.json().catch(() => ({}));
         throw new Error(`Moralis price error: ${error.message || priceRes.status}`);
       }
       const priceData = await priceRes.json();
+
       // Fetch holders
       let holders = 0;
       try {
-        const holdersRes = await fetch(`https://solana-gateway.moralis.io/token/mainnet/holders/${tokenMint}`, { headers });
+        const holdersRes = await fetch(
+          `https://solana-gateway.moralis.io/token/mainnet/holders/${tokenMint}`,
+          { headers }
+        );
         if (holdersRes.ok) {
           const holdersData = await holdersRes.json();
           holders = holdersData.totalHolders || 0;
         }
       } catch (_) {}
+
       // Fetch pair address
       let pairAddress: string | undefined = undefined;
       try {
-        const pairRes = await fetch(`https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/pairs`, { headers });
+        const pairRes = await fetch(
+          `https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/pairs`,
+          { headers }
+        );
         if (pairRes.ok) {
           const pairData = await pairRes.json();
           if (Array.isArray(pairData.pairs) && pairData.pairs.length > 0) {
@@ -59,6 +79,7 @@ export function useTokenInsights(tokenMint: string) {
           }
         }
       } catch (_) {}
+
       // Fetch OHLCV
       let ohlcv: any[] = [];
       if (pairAddress) {
@@ -75,10 +96,10 @@ export function useTokenInsights(tokenMint: string) {
           }
         } catch (_) {}
       }
+
       // Fetch logs from Supabase
       let logs: any[] = [];
       try {
-        const supabase = createClientComponentClient();
         const { data: logData, error } = await supabase
           .from('bot_logs')
           .select('*')
@@ -89,6 +110,7 @@ export function useTokenInsights(tokenMint: string) {
           logs = logData;
         }
       } catch (_) {}
+
       return {
         name: meta.name,
         symbol: meta.symbol,
@@ -98,7 +120,7 @@ export function useTokenInsights(tokenMint: string) {
         volume: Number(priceData.total24hVolumeUsd) || 0,
         createdAt: meta.createdAt || null,
         ohlcv,
-        swapVolumes: [], // TODO: Optional future add
+        swapVolumes: [],
         logs,
         pairAddress,
       };
