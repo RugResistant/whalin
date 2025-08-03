@@ -17,52 +17,68 @@ function LogsPage() {
     {
       accessorKey: 'type',
       header: '📁 Type',
-      cell: ({ getValue }) => (
-        <span className="badge badge-outline badge-info">{getValue()}</span>
-      ),
+      cell: ({ getValue }) => {
+        const type = String(getValue() ?? '—');
+        return <span className="badge badge-outline badge-info">{type}</span>;
+      },
     },
     {
       accessorKey: 'message',
       header: '📝 Message',
-      cell: ({ getValue }) => (
-        <div className="text-sm break-words whitespace-pre-wrap">{getValue()}</div>
-      ),
+      cell: ({ getValue }) => {
+        const message = String(getValue() ?? '');
+        return (
+          <div className="text-sm break-words whitespace-pre-wrap">
+            {message}
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'token_mint',
       header: '🧬 Token Mint',
-      cell: ({ getValue }) => (
-        <span className="text-xs font-mono opacity-80">{getValue()}</span>
-      ),
+      cell: ({ getValue }) => {
+        const mint = String(getValue() ?? '');
+        return <span className="text-xs font-mono opacity-80">{mint}</span>;
+      },
     },
     {
       accessorKey: 'sig',
       header: '🔏 Sig',
-      cell: ({ getValue }) => (
-        <span className="text-xs font-mono text-accent">{getValue()}</span>
-      ),
+      cell: ({ getValue }) => {
+        const sig = String(getValue() ?? '');
+        return <span className="text-xs font-mono text-accent">{sig}</span>;
+      },
     },
     {
       accessorKey: 'data',
       header: '📦 Data',
-      cell: ({ getValue }) => (
-        <details className="collapse collapse-arrow text-xs bg-base-200 rounded-lg">
-          <summary className="collapse-title text-sm font-semibold cursor-pointer">
-            View Data
-          </summary>
-          <div className="collapse-content max-h-48 overflow-auto">
-            <pre className="whitespace-pre-wrap break-all">
-              {JSON.stringify(getValue(), null, 2)}
-            </pre>
-          </div>
-        </details>
-      ),
+      cell: ({ getValue }) => {
+        const val = getValue();
+        const json = val ? JSON.stringify(val, null, 2) : 'No data';
+        return (
+          <details className="collapse collapse-arrow text-xs bg-base-200 rounded-lg">
+            <summary className="collapse-title text-sm font-semibold cursor-pointer">
+              View Data
+            </summary>
+            <div className="collapse-content max-h-48 overflow-auto">
+              <pre className="whitespace-pre-wrap break-all">{json}</pre>
+            </div>
+          </details>
+        );
+      },
     },
     {
       accessorKey: 'created_at',
       header: '📅 Created At',
-      cell: ({ getValue }) =>
-        format(new Date(getValue<string>()), 'PPP p'),
+      cell: ({ getValue }) => {
+        const date = getValue<string>();
+        return (
+          <span className="text-sm">
+            {date ? format(new Date(date), 'PPP p') : '—'}
+          </span>
+        );
+      },
     },
   ];
 
@@ -81,7 +97,7 @@ function LogsPage() {
         <h1 className="text-3xl font-bold">🧠 Bot Logs</h1>
         <input
           value={globalFilter}
-          onChange={(e) => setGlobalFilter(String(e.target.value))}
+          onChange={(e) => setGlobalFilter(e.target.value)}
           className="input input-bordered w-full max-w-sm"
           placeholder="Search logs globally..."
         />
