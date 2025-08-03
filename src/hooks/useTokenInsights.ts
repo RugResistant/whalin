@@ -1,7 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-
 const MORALIS_API_KEY = import.meta.env.VITE_MORALIS_API_KEY;
-
 export interface TokenInsights {
   name?: string;
   symbol?: string;
@@ -15,7 +13,6 @@ export interface TokenInsights {
   logs?: any[];
   pairAddress?: string;
 }
-
 export function useTokenInsights(tokenMint: string) {
   return useQuery<TokenInsights>({
     queryKey: ['token-insights', tokenMint],
@@ -23,13 +20,11 @@ export function useTokenInsights(tokenMint: string) {
       if (!tokenMint || tokenMint.length < 32) {
         throw new Error(`Invalid tokenMint: ${tokenMint}`);
       }
-
       const headers = {
         accept: 'application/json',
         'X-API-Key': MORALIS_API_KEY!,
       };
-
-      // Fetch metadata
+      // Fetch metadata (basic info like name, symbol, createdAt)
       const metaRes = await fetch(
         `https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/metadata`,
         { headers }
@@ -39,6 +34,17 @@ export function useTokenInsights(tokenMint: string) {
         throw new Error(`Moralis metadata error: ${error.message || metaRes.status}`);
       }
       const meta = await metaRes.json();
+
+      // Fetch price data (price, market cap, volume)
+      const priceRes = await fetch(
+        `https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/price`,
+        { headers }
+      );
+      if (!priceRes.ok) {
+        const error = await priceRes.json().catch(() => ({}));
+        throw new Error(`Moralis price error: ${error.message || priceRes.status}`);
+      }
+      const priceData = await priceRes.json();
 
       // Fetch holders (can fail silently)
       let holders = 0;
@@ -80,14 +86,13 @@ export function useTokenInsights(tokenMint: string) {
           ohlcv = ohlcvData.result || [];
         }
       }
-
       return {
         name: meta.name,
         symbol: meta.symbol,
-        price: Number(meta.usdPrice) || 0,
-        marketCap: Number(meta.fullyDilutedValue) || 0,
+        price: Number(priceData.usdPrice) || 0,
+        marketCap: Number(priceData.fullyDilutedValue) || 0,
         holders,
-        volume: Number(meta.total24hVolumeUsd) || 0,
+        volume: Number(priceData.total24hVolumeUsd) || 0,
         createdAt: meta.createdAt || null,
         ohlcv,
         swapVolumes: [],
