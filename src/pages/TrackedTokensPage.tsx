@@ -1,5 +1,4 @@
 // src/pages/TrackedTokensPage.tsx
-import React from 'react';
 import { useTrackedTokens } from '../hooks/useData';
 import { format } from 'date-fns';
 import { ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
