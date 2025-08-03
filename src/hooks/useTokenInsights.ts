@@ -1,65 +1,108 @@
-// src/hooks/useTokenInsights.ts
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase'; // Matches your supabase.ts
+// src/pages/TokenInsightsPage.tsx
+import { useParams } from 'react-router-dom';
+import { useTokenInsights } from '../hooks/useTokenInsights';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+} from 'recharts';
+import { format } from 'date-fns';
 
-export function useTokenInsights(tokenMint?: string) {
-  return useQuery({
-    queryKey: ['token-insights', tokenMint],
-    enabled: !!tokenMint,
-    queryFn: async () => {
-      if (!tokenMint) throw new Error('Missing token mint');
+function TokenInsightsPage() {
+  const { tokenMint } = useParams();
 
-      const [metaRes, logRes, volumeRes, ohlcvRes] = await Promise.all([
-        supabase.from('ever_bought_tokens')
-          .select('*')
-          .eq('token_mint', tokenMint)
-          .maybeSingle(),
+  if (!tokenMint) return <div className="alert alert-error">Invalid token mint</div>;
 
-        supabase.from('bot_logs')
-          .select('*')
-          .eq('token_mint', tokenMint)
-          .order('created_at', { ascending: false })
-          .limit(10),
+  const { data, isLoading, error } = useTokenInsights(tokenMint);
 
-        supabase.from('swap_volume')
-          .select('*')
-          .eq('token_mint', tokenMint)
-          .order('time', { ascending: true })
-          .limit(24),
+  if (isLoading) return <div className="loading loading-spinner text-primary" />;
+  if (error || !data) return <div className="alert alert-error">Failed to load insights</div>;
 
-        supabase.from('ohlcv')
-          .select('*')
-          .eq('token_mint', tokenMint)
-          .order('time', { ascending: true })
-          .limit(48),
-      ]);
+  return (
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">🧠 Token Insights</h1>
+        <span className="badge badge-info">{data.symbol}</span>
+      </div>
 
-      const meta = metaRes.data ?? {};
-      const logs = logRes.data ?? [];
-      const swapVolumes = (volumeRes.data ?? []).map(v => ({
-        ...v,
-        volume: parseFloat(v.volume),
-        time: v.time
-      }));
+      <Card>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4">
+          <Stat label="Name" value={data.name} />
+          <Stat label="Symbol" value={data.symbol} />
+          <Stat label="Market Cap" value={`$${data.marketCap?.toLocaleString()}`} />
+          <Stat label="Holders" value={data.holders} />
+          <Stat label="Price" value={`$${data.price}`} />
+          <Stat label="Volume (24h)" value={`$${data.volume?.toLocaleString()}`} />
+          <Stat label="Launch Date" value={format(new Date(data.createdAt), 'PPP')} />
+        </CardContent>
+      </Card>
 
-      const ohlcv = (ohlcvRes.data ?? []).map(d => ({
-        ...d,
-        close: parseFloat(d.close),
-        time: d.time
-      }));
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <h2 className="text-xl font-semibold">📈 OHLCV Chart</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={data.ohlcv ?? []}>
+              <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'p')} />
+              <YAxis domain={['auto', 'auto']} />
+              <Tooltip />
+              <Line type="monotone" dataKey="close" stroke="#10b981" dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
-      return {
-        symbol: meta.symbol || 'UNK',
-        name: meta.name || 'Unknown',
-        marketCap: meta.market_cap || 0,
-        holders: meta.holders || 0,
-        price: meta.price || 0,
-        createdAt: meta.created_at,
-        volume: swapVolumes.reduce((sum, v) => sum + v.volume, 0),
-        swapVolumes,
-        ohlcv,
-        logs,
-      };
-    }
-  });
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <h2 className="text-xl font-semibold">🔄 Swap Volume (24h)</h2>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={data.swapVolumes ?? []}>
+              <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'p')} />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="volume" fill="#3b82f6" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="text-xl font-semibold mb-4">🪵 Recent Logs</h2>
+          {data.logs?.length ? (
+            <div className="space-y-2">
+              {data.logs.map((log: any, i: number) => (
+                <div
+                  key={i}
+                  className="bg-base-300 p-3 rounded-xl border border-base-200 text-sm space-y-1"
+                >
+                  <div className="font-semibold text-accent">{log.type}</div>
+                  <div className="text-xs opacity-70">{format(new Date(log.created_at), 'PPP p')}</div>
+                  <pre className="whitespace-pre-wrap break-all text-xs">{log.message}</pre>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm opacity-60">No logs available for this token.</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
+
+function Stat({ label, value }: { label: string; value?: string | number }) {
+  return (
+    <div>
+      <div className="text-sm opacity-70">{label}</div>
+      <div className="text-lg font-semibold">{value ?? '–'}</div>
+    </div>
+  );
+}
+
+export default TokenInsightsPage;
