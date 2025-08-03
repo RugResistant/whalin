@@ -1,5 +1,5 @@
 // src/lib/moralis.ts
-const API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjUxNzExNWIxLTMxNDUtNDc0Ni05YTQ2LWE2ZDFlZTU1MmVlYyIsIm9yZ0lkIjoiNDQ3NjYzIiwidXNlcklkIjoiNDYwNTg4IiwidHlwZUlkIjoiODFjOTJlMjYtNmEwNS00MDE3LThmZjYtYzUyNjhiNWM2OWFhIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDc1MjMzODMsImV4cCI6NDkwMzI4MzM4M30.2XeEp4emBvkscIMTyam6qiYORrfFYmBOrlJtIagmt9s';
+const API_KEY = import.meta.env.VITE_MORALIS_API_KEY!;
 
 export async function enrichTokenMint(mint: string) {
   const url = `https://solana-gateway.moralis.io/token/mainnet/${mint}/metadata`;
