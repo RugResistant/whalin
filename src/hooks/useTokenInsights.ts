@@ -1,53 +1,56 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
-import { TokenInsight } from '@/types/TokenInsight';
 
-export function useTokenInsights(tokenMint?: string) {
-  return useQuery<TokenInsight | null>({
-    queryKey: ['token-insight', tokenMint],
+const MORALIS_API_KEY = import.meta.env.VITE_MORALIS_API_KEY;
+
+export interface TokenInsights {
+  name?: string;
+  symbol?: string;
+  marketCap?: number;
+  price?: number;
+  holders?: number;
+  volume?: number;
+  createdAt?: string;
+  ohlcv?: any[];
+  swapVolumes?: any[];
+  logs?: any[];
+}
+
+export function useTokenInsights(tokenMint: string) {
+  return useQuery<TokenInsights>({
+    queryKey: ['token-insights', tokenMint],
     queryFn: async () => {
-      if (!tokenMint) return null;
+      const headers = {
+        'X-API-Key': MORALIS_API_KEY!,
+        'Accept': 'application/json',
+      };
 
-      const { data: meta } = await supabase
-        .from('ever_bought_tokens')
-        .select('*')
-        .eq('token_mint', tokenMint)
-        .maybeSingle();
+      const [metaRes, holdersRes] = await Promise.all([
+        fetch(`https://deep-index.moralis.io/api/v2.2/erc20/metadata?chain=solana&addresses[]=${tokenMint}`, { headers }),
+        fetch(`https://deep-index.moralis.io/api/v2.2/erc20/${tokenMint}/holders?chain=solana`, { headers }),
+      ]);
 
-      const { data: logs } = await supabase
-        .from('bot_logs')
-        .select('*')
-        .eq('token_mint', tokenMint)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      if (!metaRes.ok || !holdersRes.ok) {
+        throw new Error('Failed to fetch Moralis token data');
+      }
 
-      const { data: ohlcv } = await supabase
-        .from('ohlcv')
-        .select('*')
-        .eq('token_mint', tokenMint)
-        .order('time', { ascending: true });
+      const metaData = await metaRes.json();
+      const holdersData = await holdersRes.json();
 
-      const { data: swapVolumes } = await supabase
-        .from('volume')
-        .select('*')
-        .eq('token_mint', tokenMint)
-        .order('time', { ascending: true });
-
-      if (!meta) return null;
+      const meta = metaData?.[0] || {};
 
       return {
-        token_mint: meta.token_mint,
-        name: meta.name,
-        symbol: meta.symbol,
-        price: meta.price,
-        marketCap: meta.marketCap,
-        holders: meta.holders,
-        createdAt: meta.createdAt,
-        volume: meta.volume,
-        logs: logs ?? [],
-        ohlcv: ohlcv ?? [],
-        swapVolumes: swapVolumes ?? [],
+        name: meta.name || 'Unknown',
+        symbol: meta.symbol || '',
+        price: meta.usdPrice || 0,
+        marketCap: meta.marketCapUsd || (meta.usdPrice && meta.totalSupply ? meta.usdPrice * meta.totalSupply : 0),
+        holders: holdersData?.total || 0,
+        volume: meta.total24hVolumeUsd || 0,
+        createdAt: meta.createdAt || null,
+        ohlcv: [],
+        swapVolumes: [],
+        logs: [],
       };
     },
+    enabled: !!tokenMint,
   });
 }
