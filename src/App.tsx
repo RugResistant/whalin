@@ -1,5 +1,4 @@
 // src/App.tsx
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import HeartbeatPage from './pages/HeartbeatPage';
 import TrackedTokensPage from './pages/TrackedTokensPage';
