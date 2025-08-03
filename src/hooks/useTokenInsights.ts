@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase'; // or correct relative path
+import { supabase } from '@/lib/supabase';
 
 const MORALIS_API_KEY = import.meta.env.VITE_MORALIS_API_KEY;
 
@@ -31,10 +31,7 @@ export function useTokenInsights(tokenMint: string) {
       };
 
       // Fetch metadata
-      const metaRes = await fetch(
-        `https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/metadata`,
-        { headers }
-      );
+      const metaRes = await fetch(`https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/metadata`, { headers });
       if (!metaRes.ok) {
         const error = await metaRes.json().catch(() => ({}));
         throw new Error(`Moralis metadata error: ${error.message || metaRes.status}`);
@@ -42,10 +39,7 @@ export function useTokenInsights(tokenMint: string) {
       const meta = await metaRes.json();
 
       // Fetch price
-      const priceRes = await fetch(
-        `https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/price`,
-        { headers }
-      );
+      const priceRes = await fetch(`https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/price`, { headers });
       if (!priceRes.ok) {
         const error = await priceRes.json().catch(() => ({}));
         throw new Error(`Moralis price error: ${error.message || priceRes.status}`);
@@ -55,10 +49,7 @@ export function useTokenInsights(tokenMint: string) {
       // Fetch holders
       let holders = 0;
       try {
-        const holdersRes = await fetch(
-          `https://solana-gateway.moralis.io/token/mainnet/holders/${tokenMint}`,
-          { headers }
-        );
+        const holdersRes = await fetch(`https://solana-gateway.moralis.io/token/mainnet/holders/${tokenMint}`, { headers });
         if (holdersRes.ok) {
           const holdersData = await holdersRes.json();
           holders = holdersData.totalHolders || 0;
@@ -68,10 +59,7 @@ export function useTokenInsights(tokenMint: string) {
       // Fetch pair address
       let pairAddress: string | undefined = undefined;
       try {
-        const pairRes = await fetch(
-          `https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/pairs`,
-          { headers }
-        );
+        const pairRes = await fetch(`https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/pairs`, { headers });
         if (pairRes.ok) {
           const pairData = await pairRes.json();
           if (Array.isArray(pairData.pairs) && pairData.pairs.length > 0) {
@@ -103,8 +91,8 @@ export function useTokenInsights(tokenMint: string) {
         const { data: logData, error } = await supabase
           .from('bot_logs')
           .select('*')
-          .eq('token', tokenMint)
-          .order('timestamp', { ascending: false })
+          .eq('token_mint', tokenMint)
+          .order('created_at', { ascending: false })
           .limit(50);
         if (!error && Array.isArray(logData)) {
           logs = logData;
