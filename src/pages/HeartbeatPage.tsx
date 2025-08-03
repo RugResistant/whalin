@@ -1,5 +1,4 @@
 // src/pages/HeartbeatPage.tsx
-import React from 'react';
 import { useHeartbeat } from '../hooks/useData';
 import { format } from 'date-fns';
 
