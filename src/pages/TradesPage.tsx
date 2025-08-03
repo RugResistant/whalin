@@ -1,5 +1,4 @@
-// src/pages/TradesPage.tsx
-import { useTrades } from '../hooks/useData';
+import { useTrades } from '@/hooks/useData';
 import { format } from 'date-fns';
 import {
   ColumnDef,
@@ -7,56 +6,58 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { useQuery } from '@tanstack/react-query';
-
-const COINGECKO_API = 'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd';
 
 function TradesPage() {
-  const { data = [], isLoading: tradesLoading, error: tradesError } = useTrades();
-  
-  // Fetch current SOL/USD price from CoinGecko
-  const { data: solPrice = 0, isLoading: priceLoading, error: priceError } = useQuery({
-    queryKey: ['sol_usd_price'],
-    queryFn: async () => {
-      const res = await fetch(COINGECKO_API);
-      const json = await res.json();
-      return json.solana?.usd || 0;
-    },
-    refetchInterval: 60000, // Refetch every minute for semi-real-time updates
-  });
+  const { data = [], isLoading, error } = useTrades();
 
   const columns: ColumnDef<any>[] = [
-    { accessorKey: 'token_mint', header: '🧬 Token Mint' },
-    { accessorFn: (row) => row.enriched?.name || 'Unknown', header: 'Name' },
-    { accessorFn: (row) => row.enriched?.symbol || 'UNK', header: 'Symbol' },
+    {
+      accessorKey: 'token_mint',
+      header: '🧬 Token Mint',
+      cell: ({ getValue }) => (
+        <a
+          href={`/insights/${getValue<string>()}`}
+          className="link link-primary break-all"
+        >
+          {getValue<string>()}
+        </a>
+      ),
+    },
+    {
+      accessorFn: (row) => row.enriched?.name ?? 'Unknown',
+      header: 'Name',
+    },
+    {
+      accessorFn: (row) => row.enriched?.symbol ?? '—',
+      header: 'Symbol',
+    },
     {
       accessorKey: 'buy_price',
-      header: 'Buy Price (USD)',
+      header: 'Buy Price (SOL)',
       cell: ({ getValue }) => {
-        const valueInSol = Number(getValue()) || 0;
-        const valueInUsd = valueInSol * solPrice;
-        return valueInUsd > 0 ? `$${valueInUsd.toFixed(12)}` : '—'; // Increased decimals for small values
+        const val = Number(getValue());
+        return val > 0 ? `${val.toFixed(6)}◎` : '—';
       },
     },
     {
       accessorKey: 'buy_timestamp',
       header: 'Buy Time',
-      cell: ({ getValue }) => format(new Date(getValue<string>()), 'PPP p'),
+      cell: ({ getValue }) =>
+        getValue() ? format(new Date(getValue<string>()), 'PP p') : '—',
     },
     {
       accessorKey: 'sell_price',
-      header: 'Sell Price (USD)',
+      header: 'Sell Price (SOL)',
       cell: ({ getValue }) => {
-        const valueInSol = Number(getValue()) || 0;
-        const valueInUsd = valueInSol * solPrice;
-        return valueInUsd > 0 ? `$${valueInUsd.toFixed(12)}` : '—';
+        const val = Number(getValue());
+        return val > 0 ? `${val.toFixed(6)}◎` : '—';
       },
     },
     {
       accessorKey: 'sell_timestamp',
       header: 'Sell Time',
       cell: ({ getValue }) =>
-        getValue() ? format(new Date(getValue<string>()), 'PPP p') : '—',
+        getValue() ? format(new Date(getValue<string>()), 'PP p') : '—',
     },
     {
       accessorKey: 'price_change_percent',
@@ -66,11 +67,10 @@ function TradesPage() {
     },
     {
       accessorKey: 'estimated_profit_sol',
-      header: 'Profit (USD)',
+      header: 'Profit (SOL)',
       cell: ({ getValue }) => {
-        const valueInSol = Number(getValue()) || 0;
-        const valueInUsd = valueInSol * solPrice;
-        return valueInUsd > 0 ? `$${valueInUsd.toFixed(12)}` : '—';
+        const val = Number(getValue());
+        return val ? `${val.toFixed(6)}◎` : '—';
       },
     },
   ];
@@ -82,11 +82,13 @@ function TradesPage() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 space-y-6">
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
       <h1 className="text-3xl font-bold">💸 Trade History</h1>
-      {(tradesLoading || priceLoading) && <div className="loading loading-spinner text-primary" />}
-      {(tradesError || priceError) && <div className="alert alert-error">Failed to load trades or SOL price</div>}
-      {!tradesLoading && !tradesError && !priceLoading && !priceError && (
+
+      {isLoading && <div className="loading loading-spinner text-primary" />}
+      {error && <div className="alert alert-error">Failed to load trades.</div>}
+
+      {!isLoading && !error && (
         <div className="overflow-x-auto rounded-lg border border-base-300">
           <table className="table table-zebra table-sm w-full">
             <thead className="bg-base-300 text-sm">
