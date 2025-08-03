@@ -1,9 +1,6 @@
-// src/hooks/useTokenInsights.ts
 import { useQuery } from '@tanstack/react-query';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-
 const MORALIS_API_KEY = import.meta.env.VITE_MORALIS_API_KEY;
-
 export interface TokenInsights {
   name?: string;
   symbol?: string;
@@ -17,7 +14,6 @@ export interface TokenInsights {
   logs?: any[];
   pairAddress?: string;
 }
-
 export function useTokenInsights(tokenMint: string) {
   return useQuery<TokenInsights>({
     queryKey: ['token-insights', tokenMint],
@@ -25,12 +21,10 @@ export function useTokenInsights(tokenMint: string) {
       if (!tokenMint || tokenMint.length < 32) {
         throw new Error(`Invalid tokenMint: ${tokenMint}`);
       }
-
       const headers = {
         accept: 'application/json',
         'X-API-Key': MORALIS_API_KEY!,
       };
-
       // Fetch metadata
       const metaRes = await fetch(`https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/metadata`, { headers });
       if (!metaRes.ok) {
@@ -38,7 +32,6 @@ export function useTokenInsights(tokenMint: string) {
         throw new Error(`Moralis metadata error: ${error.message || metaRes.status}`);
       }
       const meta = await metaRes.json();
-
       // Fetch price
       const priceRes = await fetch(`https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/price`, { headers });
       if (!priceRes.ok) {
@@ -46,7 +39,6 @@ export function useTokenInsights(tokenMint: string) {
         throw new Error(`Moralis price error: ${error.message || priceRes.status}`);
       }
       const priceData = await priceRes.json();
-
       // Fetch holders
       let holders = 0;
       try {
@@ -56,7 +48,6 @@ export function useTokenInsights(tokenMint: string) {
           holders = holdersData.totalHolders || 0;
         }
       } catch (_) {}
-
       // Fetch pair address
       let pairAddress: string | undefined = undefined;
       try {
@@ -68,13 +59,14 @@ export function useTokenInsights(tokenMint: string) {
           }
         }
       } catch (_) {}
-
       // Fetch OHLCV
       let ohlcv: any[] = [];
       if (pairAddress) {
         try {
+          const toDate = new Date().toISOString();
+          const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
           const ohlcvRes = await fetch(
-            `https://solana-gateway.moralis.io/token/mainnet/pairs/${pairAddress}/ohlcv?timeframe=1h&currency=usd&limit=24`,
+            `https://solana-gateway.moralis.io/token/mainnet/pairs/${pairAddress}/ohlcv?timeframe=1h&currency=usd&fromDate=${fromDate}&toDate=${toDate}&limit=24`,
             { headers }
           );
           if (ohlcvRes.ok) {
@@ -83,7 +75,6 @@ export function useTokenInsights(tokenMint: string) {
           }
         } catch (_) {}
       }
-
       // Fetch logs from Supabase
       let logs: any[] = [];
       try {
@@ -94,12 +85,10 @@ export function useTokenInsights(tokenMint: string) {
           .eq('token', tokenMint)
           .order('timestamp', { ascending: false })
           .limit(50);
-
         if (!error && Array.isArray(logData)) {
           logs = logData;
         }
       } catch (_) {}
-
       return {
         name: meta.name,
         symbol: meta.symbol,
