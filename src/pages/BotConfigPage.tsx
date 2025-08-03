@@ -1,6 +1,6 @@
 // src/pages/BotConfigPage.tsx
 import { useState } from 'react';
-import { supabase } from '../lib/supabase'; // Import your Supabase client
+import { supabase } from '../lib/supabase';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
@@ -12,7 +12,6 @@ import {
 function BotConfigPage() {
   const queryClient = useQueryClient();
 
-  // Fetch configs
   const { data: configs = [], isLoading: configsLoading, error: configsError } = useQuery({
     queryKey: ['bot_configs'],
     queryFn: async () => {
@@ -22,7 +21,6 @@ function BotConfigPage() {
     },
   });
 
-  // Fetch whales
   const { data: whales = [], isLoading: whalesLoading, error: whalesError } = useQuery({
     queryKey: ['whale_wallets'],
     queryFn: async () => {
@@ -32,7 +30,6 @@ function BotConfigPage() {
     },
   });
 
-  // Mutation for updating config
   const updateConfig = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
       const { error } = await supabase.from('bot_config').update({ value }).eq('key', key);
@@ -41,7 +38,6 @@ function BotConfigPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bot_configs'] }),
   });
 
-  // Mutation for adding whale
   const addWhale = useMutation({
     mutationFn: async (address: string) => {
       const { error } = await supabase.from('whale_wallets').insert({ address, active: true });
@@ -50,7 +46,6 @@ function BotConfigPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
   });
 
-  // Mutation for toggling whale active
   const toggleWhale = useMutation({
     mutationFn: async ({ address, active }: { address: string; active: boolean }) => {
       const { error } = await supabase.from('whale_wallets').update({ active }).eq('address', address);
@@ -59,7 +54,6 @@ function BotConfigPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
   });
 
-  // Mutation for deleting whale
   const deleteWhale = useMutation({
     mutationFn: async (address: string) => {
       const { error } = await supabase.from('whale_wallets').delete().eq('address', address);
@@ -68,21 +62,29 @@ function BotConfigPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
   });
 
-  // Config table columns
   const configColumns: ColumnDef<any>[] = [
     { accessorKey: 'key', header: 'Key' },
     { accessorKey: 'description', header: 'Description' },
     {
       accessorKey: 'value',
       header: 'Value',
-      cell: ({ row }) => (
-        <input
-          type="text"
-          value={row.original.value}
-          onBlur={(e) => updateConfig.mutate({ key: row.original.key, value: e.target.value })}
-          className="input input-bordered w-full"
-        />
-      ),
+      cell: ({ row }) => {
+        const [localValue, setLocalValue] = useState(row.original.value || '');
+
+        return (
+          <input
+            type="text"
+            className="input input-bordered w-full"
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onBlur={() => {
+              if (localValue !== row.original.value) {
+                updateConfig.mutate({ key: row.original.key, value: localValue });
+              }
+            }}
+          />
+        );
+      },
     },
   ];
 
@@ -92,7 +94,6 @@ function BotConfigPage() {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  // Whale table columns
   const whaleColumns: ColumnDef<any>[] = [
     { accessorKey: 'address', header: 'Address' },
     {
@@ -125,7 +126,6 @@ function BotConfigPage() {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  // Add new whale form
   const [newWhaleAddress, setNewWhaleAddress] = useState('');
   const handleAddWhale = () => {
     if (newWhaleAddress) {
@@ -134,12 +134,22 @@ function BotConfigPage() {
     }
   };
 
-  if (configsLoading || whalesLoading) return <div className="loading loading-spinner text-primary mt-8" />;
-  if (configsError || whalesError) return <div className="alert alert-error mt-8">Error loading config data: {(configsError || whalesError)?.message}</div>;
+  if (configsLoading || whalesLoading) {
+    return <div className="loading loading-spinner text-primary mt-8" />;
+  }
+
+  if (configsError || whalesError) {
+    return (
+      <div className="alert alert-error mt-8">
+        Error loading config data: {(configsError || whalesError)?.message}
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 space-y-6">
       <h1 className="text-3xl font-bold">Bot Configuration</h1>
+
       <div className="space-y-4">
         <h2 className="text-2xl font-semibold">Configs</h2>
         <div className="overflow-x-auto rounded-lg border border-base-300">
@@ -169,6 +179,7 @@ function BotConfigPage() {
           </table>
         </div>
       </div>
+
       <div className="space-y-4">
         <h2 className="text-2xl font-semibold">Whale Wallets</h2>
         <div className="flex space-x-2">
