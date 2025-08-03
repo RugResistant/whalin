@@ -1,4 +1,3 @@
-// src/pages/TokenInsightsPage.tsx
 import { useParams } from 'react-router-dom';
 import { useTokenInsights } from '../hooks/useTokenInsights';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,7 +14,7 @@ import {
 import { format } from 'date-fns';
 
 function TokenInsightsPage() {
-  const { tokenMint } = useParams<{ tokenMint: string }>();
+  const { tokenMint = '' } = useParams<{ tokenMint?: string }>();
   const { data, isLoading, error } = useTokenInsights(tokenMint);
 
   if (isLoading) return <div className="loading loading-spinner text-primary" />;
@@ -25,22 +24,57 @@ function TokenInsightsPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">📊 Token Insights</h1>
-        <span className="badge badge-info text-lg">{data.symbol}</span>
+        <span className="badge badge-info text-lg">{data.symbol || '–'}</span>
       </div>
 
       <Card>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4">
           <Stat label="🔤 Name" value={data.name} />
           <Stat label="🔠 Symbol" value={data.symbol} />
-          <Stat label="💰 Market Cap" value={`$${Number(data.marketCap).toLocaleString()}`} />
-          <Stat label="👥 Holders" value={data.holders?.toLocaleString()} />
-          <Stat label="💵 Price" value={`$${Number(data.price).toFixed(12)}`} />
-          <Stat label="📈 Volume (24h)" value={`$${Number(data.volume).toLocaleString()}`} />
-          <Stat label="🚀 Launch Date" value={format(new Date(data.createdAt), 'PPP')} />
+          <Stat
+            label="💰 Market Cap"
+            value={
+              typeof data.marketCap === 'number'
+                ? `$${data.marketCap.toLocaleString()}`
+                : '–'
+            }
+          />
+          <Stat
+            label="👥 Holders"
+            value={
+              typeof data.holders === 'number'
+                ? data.holders.toLocaleString()
+                : '–'
+            }
+          />
+          <Stat
+            label="💵 Price"
+            value={
+              typeof data.price === 'number'
+                ? `$${data.price.toFixed(12)}`
+                : '–'
+            }
+          />
+          <Stat
+            label="📈 Volume (24h)"
+            value={
+              typeof data.volume === 'number'
+                ? `$${data.volume.toLocaleString()}`
+                : '–'
+            }
+          />
+          <Stat
+            label="🚀 Launch Date"
+            value={
+              data.createdAt
+                ? format(new Date(data.createdAt), 'PPP')
+                : '–'
+            }
+          />
         </CardContent>
       </Card>
 
-      {data.ohlcv?.length > 0 && (
+      {Array.isArray(data.ohlcv) && data.ohlcv.length > 0 && (
         <Card>
           <CardContent className="p-4 space-y-4">
             <h2 className="text-xl font-semibold">📉 OHLCV Chart</h2>
@@ -56,7 +90,7 @@ function TokenInsightsPage() {
         </Card>
       )}
 
-      {data.swapVolumes?.length > 0 && (
+      {Array.isArray(data.swapVolumes) && data.swapVolumes.length > 0 && (
         <Card>
           <CardContent className="p-4 space-y-4">
             <h2 className="text-xl font-semibold">💱 Swap Volume (24h)</h2>
@@ -72,7 +106,7 @@ function TokenInsightsPage() {
         </Card>
       )}
 
-      {data.logs?.length > 0 && (
+      {Array.isArray(data.logs) && data.logs.length > 0 && (
         <Card>
           <CardContent className="p-4">
             <h2 className="text-xl font-semibold mb-4">🧠 Recent Logs</h2>
@@ -83,8 +117,14 @@ function TokenInsightsPage() {
                   className="bg-base-300 p-3 rounded-xl border border-base-200 text-sm space-y-1"
                 >
                   <div className="font-semibold text-accent">{log.type}</div>
-                  <div className="text-xs opacity-70">{format(new Date(log.created_at), 'PPP p')}</div>
-                  <pre className="whitespace-pre-wrap break-all text-xs">{log.message}</pre>
+                  <div className="text-xs opacity-70">
+                    {log.created_at
+                      ? format(new Date(log.created_at), 'PPP p')
+                      : '–'}
+                  </div>
+                  <pre className="whitespace-pre-wrap break-all text-xs">
+                    {log.message}
+                  </pre>
                 </div>
               ))}
             </div>
