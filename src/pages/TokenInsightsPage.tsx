@@ -15,7 +15,7 @@ import {
 import { format } from 'date-fns';
 
 function TokenInsightsPage() {
-  const { tokenMint } = useParams();
+  const { tokenMint } = useParams<{ tokenMint: string }>();
   const { data, isLoading, error } = useTokenInsights(tokenMint);
 
   if (isLoading) return <div className="loading loading-spinner text-primary" />;
@@ -24,67 +24,73 @@ function TokenInsightsPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Token Insights</h1>
-        <span className="badge badge-info">{data.symbol}</span>
+        <h1 className="text-3xl font-bold">📊 Token Insights</h1>
+        <span className="badge badge-info text-lg">{data.symbol}</span>
       </div>
 
       <Card>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4">
-          <Stat label="Name" value={data.name} />
-          <Stat label="Symbol" value={data.symbol} />
-          <Stat label="Market Cap" value={`$${data.marketCap?.toLocaleString()}`} />
-          <Stat label="Holders" value={data.holders} />
-          <Stat label="Price" value={`$${data.price}`} />
-          <Stat label="Volume (24h)" value={`$${data.volume}`} />
-          <Stat label="Launch Date" value={format(new Date(data.createdAt), 'PPP')} />
+          <Stat label="🔤 Name" value={data.name} />
+          <Stat label="🔠 Symbol" value={data.symbol} />
+          <Stat label="💰 Market Cap" value={`$${Number(data.marketCap).toLocaleString()}`} />
+          <Stat label="👥 Holders" value={data.holders?.toLocaleString()} />
+          <Stat label="💵 Price" value={`$${Number(data.price).toFixed(12)}`} />
+          <Stat label="📈 Volume (24h)" value={`$${Number(data.volume).toLocaleString()}`} />
+          <Stat label="🚀 Launch Date" value={format(new Date(data.createdAt), 'PPP')} />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <h2 className="text-xl font-semibold">OHLCV Chart</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data.ohlcv}>
-              <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'p')} />
-              <YAxis domain={['auto', 'auto']} />
-              <Tooltip />
-              <Line type="monotone" dataKey="close" stroke="#8884d8" dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      {data.ohlcv?.length > 0 && (
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <h2 className="text-xl font-semibold">📉 OHLCV Chart</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={data.ohlcv}>
+                <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'p')} />
+                <YAxis domain={['auto', 'auto']} />
+                <Tooltip />
+                <Line type="monotone" dataKey="close" stroke="#8884d8" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <h2 className="text-xl font-semibold">Swap Volume (24h)</h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={data.swapVolumes}>
-              <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'p')} />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="volume" fill="#22c55e" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      {data.swapVolumes?.length > 0 && (
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <h2 className="text-xl font-semibold">💱 Swap Volume (24h)</h2>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={data.swapVolumes}>
+                <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'p')} />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="volume" fill="#22c55e" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardContent className="p-4">
-          <h2 className="text-xl font-semibold mb-4">Recent Logs</h2>
-          <div className="space-y-2">
-            {data.logs.map((log: any, i: number) => (
-              <div
-                key={i}
-                className="bg-base-300 p-3 rounded-xl border border-base-200 text-sm space-y-1"
-              >
-                <div className="font-semibold text-accent">{log.type}</div>
-                <div className="text-xs opacity-70">{format(new Date(log.created_at), 'PPP p')}</div>
-                <pre className="whitespace-pre-wrap break-all text-xs">{log.message}</pre>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {data.logs?.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="text-xl font-semibold mb-4">🧠 Recent Logs</h2>
+            <div className="space-y-2">
+              {data.logs.map((log: any, i: number) => (
+                <div
+                  key={i}
+                  className="bg-base-300 p-3 rounded-xl border border-base-200 text-sm space-y-1"
+                >
+                  <div className="font-semibold text-accent">{log.type}</div>
+                  <div className="text-xs opacity-70">{format(new Date(log.created_at), 'PPP p')}</div>
+                  <pre className="whitespace-pre-wrap break-all text-xs">{log.message}</pre>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
