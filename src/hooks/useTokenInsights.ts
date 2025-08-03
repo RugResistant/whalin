@@ -1,108 +1,63 @@
-// src/pages/TokenInsightsPage.tsx
-import { useParams } from 'react-router-dom';
-import { useTokenInsights } from '../hooks/useTokenInsights';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-} from 'recharts';
-import { format } from 'date-fns';
+// src/hooks/useTokenInsights.ts
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 
-function TokenInsightsPage() {
-  const { tokenMint } = useParams();
-
-  if (!tokenMint) return <div className="alert alert-error">Invalid token mint</div>;
-
-  const { data, isLoading, error } = useTokenInsights(tokenMint);
-
-  if (isLoading) return <div className="loading loading-spinner text-primary" />;
-  if (error || !data) return <div className="alert alert-error">Failed to load insights</div>;
-
-  return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">🧠 Token Insights</h1>
-        <span className="badge badge-info">{data.symbol}</span>
-      </div>
-
-      <Card>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4">
-          <Stat label="Name" value={data.name} />
-          <Stat label="Symbol" value={data.symbol} />
-          <Stat label="Market Cap" value={`$${data.marketCap?.toLocaleString()}`} />
-          <Stat label="Holders" value={data.holders} />
-          <Stat label="Price" value={`$${data.price}`} />
-          <Stat label="Volume (24h)" value={`$${data.volume?.toLocaleString()}`} />
-          <Stat label="Launch Date" value={format(new Date(data.createdAt), 'PPP')} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <h2 className="text-xl font-semibold">📈 OHLCV Chart</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data.ohlcv ?? []}>
-              <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'p')} />
-              <YAxis domain={['auto', 'auto']} />
-              <Tooltip />
-              <Line type="monotone" dataKey="close" stroke="#10b981" dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <h2 className="text-xl font-semibold">🔄 Swap Volume (24h)</h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={data.swapVolumes ?? []}>
-              <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'p')} />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="volume" fill="#3b82f6" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <h2 className="text-xl font-semibold mb-4">🪵 Recent Logs</h2>
-          {data.logs?.length ? (
-            <div className="space-y-2">
-              {data.logs.map((log: any, i: number) => (
-                <div
-                  key={i}
-                  className="bg-base-300 p-3 rounded-xl border border-base-200 text-sm space-y-1"
-                >
-                  <div className="font-semibold text-accent">{log.type}</div>
-                  <div className="text-xs opacity-70">{format(new Date(log.created_at), 'PPP p')}</div>
-                  <pre className="whitespace-pre-wrap break-all text-xs">{log.message}</pre>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm opacity-60">No logs available for this token.</p>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
+interface TokenInsight {
+  token_mint: string;
+  name?: string;
+  symbol?: string;
+  price?: number;
+  marketCap?: number;
+  holders?: number;
+  createdAt?: string;
+  volume?: number;
+  logs?: {
+    type: string;
+    message: string;
+    created_at: string;
+  }[];
+  ohlcv?: {
+    time: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+  }[];
+  swapVolumes?: {
+    time: string;
+    volume: number;
+  }[];
 }
 
-function Stat({ label, value }: { label: string; value?: string | number }) {
-  return (
-    <div>
-      <div className="text-sm opacity-70">{label}</div>
-      <div className="text-lg font-semibold">{value ?? '–'}</div>
-    </div>
-  );
-}
+export function useTokenInsights(tokenMint?: string) {
+  return useQuery<TokenInsight | null>({
+    queryKey: ['tokenInsights', tokenMint],
+    enabled: !!tokenMint,
+    queryFn: async () => {
+      if (!tokenMint) return null;
 
-export default TokenInsightsPage;
+      const [{ data: token }, { data: logs }, { data: ohlcv }, { data: volume }] = await Promise.all([
+        supabase.from('tracked_tokens').select('*').eq('token_mint', tokenMint).maybeSingle(),
+        supabase.from('bot_logs').select('*').eq('token', tokenMint).order('created_at', { ascending: false }).limit(50),
+        supabase.from('ohlcv').select('*').eq('token', tokenMint).order('time', { ascending: true }),
+        supabase.from('volume').select('*').eq('token', tokenMint).order('time', { ascending: true }),
+      ]);
+
+      if (!token) throw new Error('Token not found');
+
+      return {
+        token_mint: tokenMint,
+        name: token.name,
+        symbol: token.symbol,
+        price: token.price,
+        marketCap: token.market_cap,
+        holders: token.holder_count,
+        createdAt: token.created_at,
+        volume: volume?.reduce((acc, cur) => acc + (cur.volume ?? 0), 0),
+        logs,
+        ohlcv,
+        swapVolumes: volume,
+      };
+    },
+  });
+}
