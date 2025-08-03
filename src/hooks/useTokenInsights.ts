@@ -19,33 +19,34 @@ export function useTokenInsights(tokenMint: string) {
   return useQuery<TokenInsights>({
     queryKey: ['token-insights', tokenMint],
     queryFn: async () => {
+      if (!MORALIS_API_KEY) throw new Error('Missing Moralis API key');
+
       const headers = {
-        'X-API-Key': MORALIS_API_KEY!,
+        'X-API-Key': MORALIS_API_KEY,
         'Accept': 'application/json',
       };
 
       const [metaRes, holdersRes] = await Promise.all([
-        fetch(`https://deep-index.moralis.io/api/v2.2/erc20/metadata?chain=solana&addresses[]=${tokenMint}`, { headers }),
-        fetch(`https://deep-index.moralis.io/api/v2.2/erc20/${tokenMint}/holders?chain=solana`, { headers }),
+        fetch(`https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/metadata`, { headers }),
+        fetch(`https://solana-gateway.moralis.io/token/mainnet/${tokenMint}/holders`, { headers }),
       ]);
 
       if (!metaRes.ok || !holdersRes.ok) {
-        throw new Error('Failed to fetch Moralis token data');
+        const msg = `Metadata: ${metaRes.status}, Holders: ${holdersRes.status}`;
+        throw new Error(`Failed to fetch Moralis token data — ${msg}`);
       }
 
-      const metaData = await metaRes.json();
-      const holdersData = await holdersRes.json();
-
-      const meta = metaData?.[0] || {};
+      const meta = await metaRes.json();
+      const holders = await holdersRes.json();
 
       return {
-        name: meta.name || 'Unknown',
-        symbol: meta.symbol || '',
-        price: meta.usdPrice || 0,
-        marketCap: meta.marketCapUsd || (meta.usdPrice && meta.totalSupply ? meta.usdPrice * meta.totalSupply : 0),
-        holders: holdersData?.total || 0,
-        volume: meta.total24hVolumeUsd || 0,
-        createdAt: meta.createdAt || null,
+        name: meta?.name ?? 'Unknown',
+        symbol: meta?.symbol ?? '',
+        price: meta?.price_usd ?? 0,
+        marketCap: meta?.market_cap_usd ?? 0,
+        holders: holders?.total ?? 0,
+        volume: meta?.volume_24h_usd ?? 0,
+        createdAt: meta?.createdAt ?? null,
         ohlcv: [],
         swapVolumes: [],
         logs: [],
