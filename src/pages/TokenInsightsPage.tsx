@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useTokenInsights } from '../hooks/useTokenInsights';
-import { Card, CardContent } from '../../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import {
   BarChart,
   Bar,
