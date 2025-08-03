@@ -9,7 +9,6 @@ import {
 } from '@tanstack/react-table';
 import { useQuery } from '@tanstack/react-query';
 
-const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const COINGECKO_API = 'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd';
 
 function TradesPage() {
