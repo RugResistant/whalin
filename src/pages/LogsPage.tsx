@@ -1,4 +1,3 @@
-// src/pages/LogsPage.tsx
 import { useState } from 'react';
 import { useLogs } from '../hooks/useData';
 import { format } from 'date-fns';
@@ -15,17 +14,48 @@ function LogsPage() {
   const [globalFilter, setGlobalFilter] = useState('');
 
   const columns: ColumnDef<any>[] = [
-    { accessorKey: 'type', header: '📁 Type' },
-    { accessorKey: 'message', header: '📝 Message' },
-    { accessorKey: 'token_mint', header: '🧬 Token Mint' },
-    { accessorKey: 'sig', header: '🔏 Sig' },
+    {
+      accessorKey: 'type',
+      header: '📁 Type',
+      cell: ({ getValue }) => (
+        <span className="badge badge-outline badge-info">{getValue()}</span>
+      ),
+    },
+    {
+      accessorKey: 'message',
+      header: '📝 Message',
+      cell: ({ getValue }) => (
+        <div className="text-sm break-words whitespace-pre-wrap">{getValue()}</div>
+      ),
+    },
+    {
+      accessorKey: 'token_mint',
+      header: '🧬 Token Mint',
+      cell: ({ getValue }) => (
+        <span className="text-xs font-mono opacity-80">{getValue()}</span>
+      ),
+    },
+    {
+      accessorKey: 'sig',
+      header: '🔏 Sig',
+      cell: ({ getValue }) => (
+        <span className="text-xs font-mono text-accent">{getValue()}</span>
+      ),
+    },
     {
       accessorKey: 'data',
       header: '📦 Data',
       cell: ({ getValue }) => (
-        <pre className="whitespace-pre-wrap text-xs overflow-auto max-h-32">
-          {JSON.stringify(getValue(), null, 2)}
-        </pre>
+        <details className="collapse collapse-arrow text-xs bg-base-200 rounded-lg">
+          <summary className="collapse-title text-sm font-semibold cursor-pointer">
+            View Data
+          </summary>
+          <div className="collapse-content max-h-48 overflow-auto">
+            <pre className="whitespace-pre-wrap break-all">
+              {JSON.stringify(getValue(), null, 2)}
+            </pre>
+          </div>
+        </details>
       ),
     },
     {
@@ -47,14 +77,15 @@ function LogsPage() {
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 space-y-6">
-      <h1 className="text-3xl font-bold">🧠 Bot Logs</h1>
-
-      <input
-        value={globalFilter}
-        onChange={(e) => setGlobalFilter(String(e.target.value))}
-        className="input input-bordered w-full max-w-xl"
-        placeholder="Search logs globally..."
-      />
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">🧠 Bot Logs</h1>
+        <input
+          value={globalFilter}
+          onChange={(e) => setGlobalFilter(String(e.target.value))}
+          className="input input-bordered w-full max-w-sm"
+          placeholder="Search logs globally..."
+        />
+      </div>
 
       {isLoading && <div className="loading loading-spinner text-primary" />}
       {error && <div className="alert alert-error">Failed to load logs</div>}
