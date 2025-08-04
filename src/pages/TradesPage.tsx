@@ -20,22 +20,27 @@ type Trade = {
     name?: string;
     symbol?: string;
   };
-  buy_price: string;
-  sell_price: string;
-  price_change_percent: string;
-  estimated_profit_sol: string;
+  buy_price: number;
+  sell_price: number;
+  price_change_percent: number;
+  estimated_profit_sol: number;
   buy_timestamp: string | null;
   sell_timestamp: string | null;
+  token_amount_sold?: string;
+  decimals?: number;
 };
 
 function TradesPage() {
   const [copiedMint, setCopiedMint] = useState<string | null>(null);
+
   const {
     data: rawData = [],
     isLoading: tradesLoading,
     error: tradesError,
   } = useTrades();
+
   const data = rawData as Trade[];
+
   const {
     data: solPrice = 0,
     isLoading: priceLoading,
@@ -49,13 +54,16 @@ function TradesPage() {
     },
     refetchInterval: 60000,
   });
+
   const handleCopy = async (mint: string) => {
     await navigator.clipboard.writeText(mint);
     setCopiedMint(mint);
     setTimeout(() => setCopiedMint(null), 1500);
   };
+
   const columnHelper = createColumnHelper<Trade>();
-  const columns = [
+
+  const columns: ColumnDef<Trade>[] = [
     columnHelper.accessor('token_mint', {
       header: '🧬 Token',
       cell: ({ row }) => {
@@ -93,7 +101,7 @@ function TradesPage() {
     columnHelper.accessor('buy_price', {
       header: 'Buy (USD)',
       cell: ({ getValue }) => {
-        const val = Number(getValue()) || 0;
+        const val = getValue() || 0;
         const usd = val * solPrice;
         return usd > 0 ? `$${usd.toFixed(6)}` : '—';
       },
@@ -101,7 +109,7 @@ function TradesPage() {
     columnHelper.accessor('sell_price', {
       header: 'Sell (USD)',
       cell: ({ getValue }) => {
-        const val = Number(getValue()) || 0;
+        const val = getValue() || 0;
         const usd = val * solPrice;
         return usd > 0 ? `$${usd.toFixed(6)}` : '—';
       },
@@ -109,12 +117,12 @@ function TradesPage() {
     columnHelper.accessor('price_change_percent', {
       header: 'Change',
       cell: ({ getValue }) => {
-        const change = Number(getValue());
+        const change = getValue() || 0;
         const emoji = change > 0 ? '🚀' : change < 0 ? '💀' : '';
         const color = change > 0 ? 'text-green-500' : change < 0 ? 'text-red-500' : 'text-base-content';
         return (
           <span className={`font-medium ${color}`}>
-            {emoji} {isNaN(change) ? '—' : `${change.toFixed(2)}%`}
+            {emoji} {change.toFixed(2)}%
           </span>
         );
       },
@@ -122,7 +130,7 @@ function TradesPage() {
     columnHelper.accessor('estimated_profit_sol', {
       header: 'Profit',
       cell: ({ getValue }) => {
-        const sol = Number(getValue()) || 0;
+        const sol = getValue() || 0;
         const usd = sol * solPrice;
         const emoji = usd > 0 ? '🟢' : usd < 0 ? '🔴' : '';
         const color = usd > 0 ? 'text-green-500' : usd < 0 ? 'text-red-500' : 'text-base-content';
@@ -149,12 +157,19 @@ function TradesPage() {
         return format(new Date(value), 'PP p');
       },
     }),
+    // Optional new column for token amount sold
+    columnHelper.accessor('token_amount_sold', {
+      header: 'Tokens Sold',
+      cell: ({ getValue }) => getValue() || '—',
+    }),
   ];
+
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
       <h1 className="text-3xl font-bold">💸 Trade History</h1>
