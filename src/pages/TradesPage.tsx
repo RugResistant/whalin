@@ -8,10 +8,24 @@ import {
 } from '@tanstack/react-table';
 import { useQuery } from '@tanstack/react-query';
 import { ClipboardCopy, CheckCircle2 } from 'lucide-react';
-import { ReactNode, useState } from 'react';
+import { useState } from 'react';
 
 const COINGECKO_API =
   'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd';
+
+type Trade = {
+  token_mint: string;
+  enriched?: {
+    name?: string;
+    symbol?: string;
+  };
+  buy_price: number;
+  sell_price: number;
+  price_change_percent: number;
+  estimated_profit_sol: number;
+  buy_timestamp: string | null;
+  sell_timestamp: string | null;
+};
 
 function TradesPage() {
   const [copiedMint, setCopiedMint] = useState<string | null>(null);
@@ -38,7 +52,7 @@ function TradesPage() {
     setCopiedMint(mint);
     setTimeout(() => setCopiedMint(null), 1500);
   };
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<Trade>[] = [
     {
       accessorKey: 'token_mint',
       header: '🧬 Token',
@@ -124,17 +138,21 @@ function TradesPage() {
     {
       accessorKey: 'buy_timestamp',
       header: 'Buy Time',
-      cell: ({ getValue }) =>
-        getValue() ? format(new Date(getValue<string>()), 'PP p') : '—',
+      cell: ({ getValue }) => {
+        const value = getValue();
+        return value ? format(new Date(value), 'PP p') : '—';
+      },
     },
     {
       accessorKey: 'sell_timestamp',
       header: 'Sell Time',
-      cell: ({ getValue }) =>
-        getValue() ? format(new Date(getValue<string>()), 'PP p') : '—',
+      cell: ({ getValue }) => {
+        const value = getValue();
+        return value ? format(new Date(value), 'PP p') : '—';
+      },
     },
   ];
-  const table = useReactTable({
+  const table = useReactTable<Trade>({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
@@ -165,7 +183,7 @@ function TradesPage() {
                         : flexRender(
                             header.column.columnDef.header,
                             header.getContext()
-                          ) as ReactNode}
+                          )}
                     </th>
                   ))}
                 </tr>
@@ -179,7 +197,7 @@ function TradesPage() {
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
-                      ) as ReactNode}
+                      )}
                     </td>
                   ))}
                 </tr>
