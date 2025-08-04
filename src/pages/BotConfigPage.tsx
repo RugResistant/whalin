@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ColumnDef } from '@tanstack/react-table';
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
+import { useReactTable, getCoreRowModel, flexRender, type ColumnDef } from '@tanstack/react-table';
+import { Settings, Wallet, Save, Trash2 } from 'lucide-react';
+import clsx from 'clsx';
 
 function BotConfigPage() {
   const queryClient = useQueryClient();
@@ -71,19 +68,27 @@ function BotConfigPage() {
       header: 'Value',
       cell: ({ row }) => {
         const [localValue, setLocalValue] = useState(row.original.value || '');
+        const [dirty, setDirty] = useState(false);
 
         return (
-          <input
-            type="text"
-            className="input input-bordered w-full"
-            value={localValue}
-            onChange={(e) => setLocalValue(e.target.value)}
-            onBlur={() => {
-              if (localValue !== row.original.value) {
-                updateConfig.mutate({ key: row.original.key, value: localValue });
-              }
-            }}
-          />
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              className="input input-sm input-bordered w-full"
+              value={localValue}
+              onChange={(e) => {
+                setLocalValue(e.target.value);
+                setDirty(true);
+              }}
+              onBlur={() => {
+                if (dirty && localValue !== row.original.value) {
+                  updateConfig.mutate({ key: row.original.key, value: localValue });
+                  setDirty(false);
+                }
+              }}
+            />
+            {dirty && <Save className="w-4 h-4 text-blue-500" />}
+          </div>
         );
       },
     },
@@ -102,23 +107,31 @@ function BotConfigPage() {
       header: 'Description',
       cell: ({ row }) => {
         const [localDesc, setLocalDesc] = useState(row.original.description || '');
+        const [dirty, setDirty] = useState(false);
 
         return (
-          <input
-            type="text"
-            className="input input-bordered input-sm w-full"
-            value={localDesc}
-            onChange={(e) => setLocalDesc(e.target.value)}
-            onBlur={() => {
-              if (localDesc !== row.original.description) {
-                supabase
-                  .from('whale_wallets')
-                  .update({ description: localDesc })
-                  .eq('address', row.original.address)
-                  .then(() => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }));
-              }
-            }}
-          />
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              className="input input-sm input-bordered w-full"
+              value={localDesc}
+              onChange={(e) => {
+                setLocalDesc(e.target.value);
+                setDirty(true);
+              }}
+              onBlur={() => {
+                if (dirty && localDesc !== row.original.description) {
+                  supabase
+                    .from('whale_wallets')
+                    .update({ description: localDesc })
+                    .eq('address', row.original.address)
+                    .then(() => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }));
+                  setDirty(false);
+                }
+              }}
+            />
+            {dirty && <Save className="w-4 h-4 text-green-500" />}
+          </div>
         );
       },
     },
@@ -128,8 +141,11 @@ function BotConfigPage() {
       cell: ({ row }) => (
         <input
           type="checkbox"
+          className="toggle toggle-sm"
           checked={row.original.active}
-          onChange={(e) => toggleWhale.mutate({ address: row.original.address, active: e.target.checked })}
+          onChange={(e) =>
+            toggleWhale.mutate({ address: row.original.address, active: e.target.checked })
+          }
         />
       ),
     },
@@ -137,10 +153,10 @@ function BotConfigPage() {
       header: 'Actions',
       cell: ({ row }) => (
         <button
-          className="btn btn-error btn-xs"
+          className="btn btn-xs btn-error btn-outline"
           onClick={() => deleteWhale.mutate(row.original.address)}
         >
-          Delete
+          <Trash2 className="w-4 h-4" />
         </button>
       ),
     },
@@ -162,98 +178,118 @@ function BotConfigPage() {
     }
   };
 
-  if (configsLoading || whalesLoading) {
-    return <div className="loading loading-spinner text-primary mt-8" />;
-  }
-
-  if (configsError || whalesError) {
-    return (
-      <div className="alert alert-error mt-8">
-        Error loading config data: {(configsError || whalesError)?.message}
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 space-y-6">
-      <h1 className="text-3xl font-bold">Bot Configuration</h1>
+    <div className="max-w-7xl mx-auto py-8 px-4 space-y-8">
+      <div className="flex items-center gap-2">
+        <Settings className="w-6 h-6 text-primary" />
+        <h1 className="text-3xl font-bold">Bot Configuration</h1>
+      </div>
 
-      <div className="space-y-4">
-        <h2 className="text-2xl font-semibold">Configs</h2>
-        <div className="overflow-x-auto rounded-lg border border-base-300">
-          <table className="table table-zebra table-sm w-full">
-            <thead className="bg-base-300 text-sm">
-              {configTable.getHeaderGroups().map((group) => (
-                <tr key={group.id}>
-                  {group.headers.map((header) => (
-                    <th key={header.id}>
-                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                    </th>
+      {/* CONFIGS */}
+      <div className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <Settings className="w-5 h-5" /> Configs
+          </h2>
+          {configsLoading ? (
+            <div className="loading loading-spinner text-primary" />
+          ) : configs.length === 0 ? (
+            <div className="text-sm text-gray-500">No configs found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table table-zebra table-sm w-full">
+                <thead className="bg-base-200">
+                  {configTable.getHeaderGroups().map((group) => (
+                    <tr key={group.id}>
+                      {group.headers.map((header) => (
+                        <th key={header.id}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                        </th>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {configTable.getRowModel().rows.map((row) => (
-                <tr key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
+                </thead>
+                <tbody>
+                  {configTable.getRowModel().rows.map((row) => (
+                    <tr key={row.id}>
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-2xl font-semibold">Whale Wallets</h2>
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            value={newWhaleAddress}
-            onChange={(e) => setNewWhaleAddress(e.target.value)}
-            placeholder="Whale address (e.g. 7dkU7s3...)"
-            className="input input-bordered w-1/2"
-          />
-          <input
-            type="text"
-            value={newWhaleDescription}
-            onChange={(e) => setNewWhaleDescription(e.target.value)}
-            placeholder="Description (optional)"
-            className="input input-bordered w-1/2"
-          />
-          <button className="btn btn-primary" onClick={handleAddWhale}>
-            Add
-          </button>
-        </div>
-        <div className="overflow-x-auto rounded-lg border border-base-300">
-          <table className="table table-zebra table-sm w-full">
-            <thead className="bg-base-300 text-sm">
-              {whaleTable.getHeaderGroups().map((group) => (
-                <tr key={group.id}>
-                  {group.headers.map((header) => (
-                    <th key={header.id}>
-                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                    </th>
+      {/* WHALES */}
+      <div className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold flex items-center gap-2">
+              <Wallet className="w-5 h-5" /> Whale Wallets
+            </h2>
+            <span className="badge badge-primary badge-outline">
+              {whales?.length || 0} Tracked
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={newWhaleAddress}
+              onChange={(e) => setNewWhaleAddress(e.target.value)}
+              placeholder="Wallet address"
+              className="input input-bordered w-full"
+            />
+            <input
+              type="text"
+              value={newWhaleDescription}
+              onChange={(e) => setNewWhaleDescription(e.target.value)}
+              placeholder="Optional description"
+              className="input input-bordered w-full"
+            />
+            <button className="btn btn-primary" onClick={handleAddWhale}>
+              Add
+            </button>
+          </div>
+
+          {whalesLoading ? (
+            <div className="loading loading-spinner text-primary" />
+          ) : whales.length === 0 ? (
+            <div className="text-sm text-gray-500">No whale wallets found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table table-zebra table-sm w-full">
+                <thead className="bg-base-200">
+                  {whaleTable.getHeaderGroups().map((group) => (
+                    <tr key={group.id}>
+                      {group.headers.map((header) => (
+                        <th key={header.id}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                        </th>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {whaleTable.getRowModel().rows.map((row) => (
-                <tr key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
+                </thead>
+                <tbody>
+                  {whaleTable.getRowModel().rows.map((row) => (
+                    <tr key={row.id}>
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
