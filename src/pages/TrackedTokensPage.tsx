@@ -1,3 +1,4 @@
+// src/pages/TrackedTokensPage.tsx
 import { useTrackedTokens } from '../hooks/useData';
 import { format } from 'date-fns';
 import {
@@ -9,60 +10,88 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
+type TokenRow = {
+  token_mint: string;
+  enriched?: {
+    name?: string;
+    symbol?: string;
+  };
+  buy_price: number;
+  buy_sig: string;
+  bought_at: string;
+};
+
+type Snapshot = {
+  token_mint: string;
+  price: number;
+  captured_at: string;
+};
+
 function TrackedTokensPage() {
-  const { data = [], isLoading, error } = useTrackedTokens({ refetchInterval: 10000 }); // Poll every 10s for real-time
+  const { data = [], isLoading, error } = useTrackedTokens();
+
   const {
     data: solPrice = 0,
     isLoading: priceLoading,
-  } = useQuery({
+  } = useQuery<number>({
     queryKey: ['sol_usd_price'],
     queryFn: async () => {
-      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+      const res = await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd'
+      );
       const json = await res.json();
       return json.solana?.usd || 0;
     },
     refetchInterval: 60000,
   });
 
-  // Fetch latest prices from price_snapshots for all tracked tokens
-  const { data: latestPrices = {} } = useQuery({
-    queryKey: ['latest_prices', data.map(t => t.token_mint)],
+  const {
+    data: latestPrices = {},
+  } = useQuery<Record<string, number>>({
+    queryKey: ['latest_prices', data.map((t) => t.token_mint)],
     queryFn: async () => {
       if (!data.length) return {};
       const { data: snapshots } = await supabase
         .from('price_snapshots')
         .select('token_mint, price, captured_at')
-        .in('token_mint', data.map(t => t.token_mint))
+        .in('token_mint', data.map((t) => t.token_mint))
         .order('captured_at', { ascending: false });
-      return snapshots.reduce((acc, snap) => {
-        if (!acc[snap.token_mint]) acc[snap.token_mint] = snap.price;
-        return acc;
-      }, {});
+
+      const prices: Record<string, number> = {};
+      (snapshots ?? []).forEach((snap: Snapshot) => {
+        if (!prices[snap.token_mint]) {
+          prices[snap.token_mint] = snap.price;
+        }
+      });
+
+      return prices;
     },
-    enabled: !!data.length,
-    refetchInterval: 10000, // Real-time poll
+    enabled: data.length > 0,
+    refetchInterval: 10000,
   });
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<TokenRow>[] = [
     {
       accessorKey: 'token_mint',
       header: '🧬 Token Mint',
       cell: ({ getValue }) => (
         <a
-          href={`/insights/${getValue<string>()}`}
+          href={`/insights/${getValue()}`}
           className="link link-primary break-all"
         >
-          {getValue<string>()}
+          {getValue()}
         </a>
       ),
     },
     {
       accessorFn: (row) => row.enriched?.name || 'Unknown',
       header: 'Name',
+      id: 'name',
     },
     {
       accessorFn: (row) => row.enriched?.symbol || 'UNK',
       header: 'Symbol',
+      id: 'symbol',
     },
     {
       accessorKey: 'buy_price',
@@ -72,16 +101,17 @@ function TrackedTokensPage() {
     {
       id: 'current_price',
       header: 'Current Price (SOL)',
-      cell: ({ row }) => (latestPrices[row.original.token_mint] || 0).toFixed(10),
+      cell: ({ row }) =>
+        (latestPrices[row.original.token_mint] ?? 0).toFixed(10),
     },
     {
       id: 'change_percent',
       header: 'Change %',
       cell: ({ row }) => {
         const buy = row.original.buy_price;
-        const current = latestPrices[row.original.token_mint] || 0;
+        const current = latestPrices[row.original.token_mint] ?? 0;
         if (!buy || !current) return '—';
-        const change = ((current - buy) / buy * 100);
+        const change = ((current - buy) / buy) * 100;
         const color = change > 0 ? 'text-green-500' : 'text-red-500';
         return <span className={color}>{change.toFixed(2)}%</span>;
       },
@@ -91,9 +121,9 @@ function TrackedTokensPage() {
       header: 'Est. P/L (SOL)',
       cell: ({ row }) => {
         const buy = row.original.buy_price;
-        const current = latestPrices[row.original.token_mint] || 0;
+        const current = latestPrices[row.original.token_mint] ?? 0;
         if (!buy || !current) return '—';
-        const solSpent = 30000000 / 1e9; // From MY_SPEND_LAMPORTS default
+        const solSpent = 30_000_000 / 1e9;
         const estTokens = solSpent / buy;
         const pl = estTokens * current - solSpent;
         const color = pl > 0 ? 'text-green-500' : 'text-red-500';
@@ -105,9 +135,9 @@ function TrackedTokensPage() {
       header: 'Est. P/L (USD)',
       cell: ({ row }) => {
         const buy = row.original.buy_price;
-        const current = latestPrices[row.original.token_mint] || 0;
+        const current = latestPrices[row.original.token_mint] ?? 0;
         if (!buy || !current || priceLoading) return '—';
-        const solSpent = 30000000 / 1e9;
+        const solSpent = 30_000_000 / 1e9;
         const estTokens = solSpent / buy;
         const plSol = estTokens * current - solSpent;
         const plUsd = plSol * solPrice;
@@ -136,11 +166,13 @@ function TrackedTokensPage() {
         getValue() ? format(new Date(getValue<string>()), 'PPP p') : '—',
     },
   ];
+
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
+
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 space-y-6">
       <h1 className="text-3xl font-bold">📊 Currently Tracked Tokens</h1>
