@@ -173,7 +173,7 @@ function TradesPage() {
                         : flexRender(
                             header.column.columnDef.header,
                             header.getContext()
-                          ) as React.ReactNode}
+                          ) as React.ReactElement | null}
                     </th>
                   ))}
                 </tr>
@@ -187,7 +187,7 @@ function TradesPage() {
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
-                      ) as React.ReactNode}
+                      ) as React.ReactElement | null}
                     </td>
                   ))}
                 </tr>
