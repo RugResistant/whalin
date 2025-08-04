@@ -1,4 +1,3 @@
-// src/pages/TrackedTokensPage.tsx
 import { useTrackedTokens } from '../hooks/useData';
 import { format } from 'date-fns';
 import {
@@ -36,9 +35,7 @@ function TrackedTokensPage() {
   } = useQuery<number>({
     queryKey: ['sol_usd_price'],
     queryFn: async () => {
-      const res = await fetch(
-        'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd'
-      );
+      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
       const json = await res.json();
       return json.solana?.usd || 0;
     },
@@ -84,25 +81,28 @@ function TrackedTokensPage() {
       ),
     },
     {
-      accessorFn: (row) => row.enriched?.name || 'Unknown',
-      header: 'Name',
       id: 'name',
+      header: 'Name',
+      accessorFn: (row) => row.enriched?.name || 'Unknown',
+      cell: ({ getValue }) => <span>{getValue()}</span>,
     },
     {
-      accessorFn: (row) => row.enriched?.symbol || 'UNK',
-      header: 'Symbol',
       id: 'symbol',
+      header: 'Symbol',
+      accessorFn: (row) => row.enriched?.symbol || 'UNK',
+      cell: ({ getValue }) => <span>{getValue()}</span>,
     },
     {
       accessorKey: 'buy_price',
       header: 'Buy Price (SOL)',
-      cell: ({ getValue }) => getValue<number>().toFixed(10),
+      cell: ({ getValue }) => <span>{getValue<number>().toFixed(10)}</span>,
     },
     {
       id: 'current_price',
       header: 'Current Price (SOL)',
-      cell: ({ row }) =>
-        (latestPrices[row.original.token_mint] ?? 0).toFixed(10),
+      cell: ({ row }) => (
+        <span>{(latestPrices[row.original.token_mint] ?? 0).toFixed(10)}</span>
+      ),
     },
     {
       id: 'change_percent',
@@ -110,7 +110,7 @@ function TrackedTokensPage() {
       cell: ({ row }) => {
         const buy = row.original.buy_price;
         const current = latestPrices[row.original.token_mint] ?? 0;
-        if (!buy || !current) return '—';
+        if (!buy || !current) return <span>—</span>;
         const change = ((current - buy) / buy) * 100;
         const color = change > 0 ? 'text-green-500' : 'text-red-500';
         return <span className={color}>{change.toFixed(2)}%</span>;
@@ -122,7 +122,7 @@ function TrackedTokensPage() {
       cell: ({ row }) => {
         const buy = row.original.buy_price;
         const current = latestPrices[row.original.token_mint] ?? 0;
-        if (!buy || !current) return '—';
+        if (!buy || !current) return <span>—</span>;
         const solSpent = 30_000_000 / 1e9;
         const estTokens = solSpent / buy;
         const pl = estTokens * current - solSpent;
@@ -136,7 +136,7 @@ function TrackedTokensPage() {
       cell: ({ row }) => {
         const buy = row.original.buy_price;
         const current = latestPrices[row.original.token_mint] ?? 0;
-        if (!buy || !current || priceLoading) return '—';
+        if (!buy || !current || priceLoading) return <span>—</span>;
         const solSpent = 30_000_000 / 1e9;
         const estTokens = solSpent / buy;
         const plSol = estTokens * current - solSpent;
@@ -163,7 +163,11 @@ function TrackedTokensPage() {
       accessorKey: 'bought_at',
       header: 'Bought At',
       cell: ({ getValue }) =>
-        getValue() ? format(new Date(getValue<string>()), 'PPP p') : '—',
+        getValue() ? (
+          <span>{format(new Date(getValue<string>()), 'PPP p')}</span>
+        ) : (
+          <span>—</span>
+        ),
     },
   ];
 
@@ -190,10 +194,7 @@ function TrackedTokensPage() {
                     <th key={header.id}>
                       {header.isPlaceholder
                         ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                        : flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
                   ))}
                 </tr>
@@ -204,10 +205,7 @@ function TrackedTokensPage() {
                 <tr key={row.id}>
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
                 </tr>
