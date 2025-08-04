@@ -18,7 +18,6 @@ import {
   Trash2,
   PlusCircle,
 } from 'lucide-react';
-import clsx from 'clsx';
 
 function BotConfigPage() {
   const queryClient = useQueryClient();
@@ -157,17 +156,19 @@ function BotConfigPage() {
       accessorKey: 'active',
       header: 'Active',
       cell: ({ row }) => (
-        <input
-          type="checkbox"
-          className="checkbox checkbox-sm"
-          checked={row.original.active}
-          onChange={(e) =>
-            toggleWhale.mutate({
-              address: row.original.address,
-              active: e.target.checked,
-            })
-          }
-        />
+        <label className="cursor-pointer">
+          <input
+            type="checkbox"
+            className="toggle toggle-sm toggle-success"
+            checked={row.original.active}
+            onChange={(e) =>
+              toggleWhale.mutate({
+                address: row.original.address,
+                active: e.target.checked,
+              })
+            }
+          />
+        </label>
       ),
     },
     {
