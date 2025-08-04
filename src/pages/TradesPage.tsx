@@ -1,3 +1,4 @@
+// src/pages/TradesPage.tsx
 import { useTrades } from '../hooks/useData';
 import { format } from 'date-fns';
 import {
@@ -39,7 +40,7 @@ function TradesPage() {
     error: tradesError,
   } = useTrades();
 
-  const data = rawData as Trade[];
+  const data: Trade[] = rawData;
 
   const {
     data: solPrice = 0,
@@ -96,7 +97,9 @@ function TradesPage() {
     columnHelper.accessor((row) => row.enriched?.symbol ?? '—', {
       id: 'symbol',
       header: 'Symbol',
-      cell: (info) => <span className="text-sm font-mono">{info.getValue()}</span>,
+      cell: (info) => (
+        <span className="text-sm font-mono">{info.getValue()}</span>
+      ),
     }),
     columnHelper.accessor('buy_price', {
       header: 'Buy (USD)',
@@ -119,7 +122,12 @@ function TradesPage() {
       cell: ({ getValue }) => {
         const change = getValue() || 0;
         const emoji = change > 0 ? '🚀' : change < 0 ? '💀' : '';
-        const color = change > 0 ? 'text-green-500' : change < 0 ? 'text-red-500' : 'text-base-content';
+        const color =
+          change > 0
+            ? 'text-green-500'
+            : change < 0
+            ? 'text-red-500'
+            : 'text-base-content';
         return (
           <span className={`font-medium ${color}`}>
             {emoji} {change.toFixed(2)}%
@@ -133,7 +141,12 @@ function TradesPage() {
         const sol = getValue() || 0;
         const usd = sol * solPrice;
         const emoji = usd > 0 ? '🟢' : usd < 0 ? '🔴' : '';
-        const color = usd > 0 ? 'text-green-500' : usd < 0 ? 'text-red-500' : 'text-base-content';
+        const color =
+          usd > 0
+            ? 'text-green-500'
+            : usd < 0
+            ? 'text-red-500'
+            : 'text-base-content';
         return (
           <span className={`font-semibold ${color}`}>
             {emoji} {usd !== 0 ? `$${usd.toFixed(6)}` : '—'}
@@ -145,21 +158,19 @@ function TradesPage() {
       header: 'Buy Time',
       cell: ({ getValue }) => {
         const value = getValue();
-        if (!value) return '—';
-        return format(new Date(value), 'PP p');
+        return value ? format(new Date(value), 'PP p') : '—';
       },
     }),
     columnHelper.accessor('sell_timestamp', {
       header: 'Sell Time',
       cell: ({ getValue }) => {
         const value = getValue();
-        if (!value) return '—';
-        return format(new Date(value), 'PP p');
+        return value ? format(new Date(value), 'PP p') : '—';
       },
     }),
     columnHelper.accessor('token_amount_sold', {
       header: 'Tokens Sold',
-      cell: ({ getValue }) => getValue() || '—',
+      cell: ({ getValue }) => getValue() ?? '—',
     }),
   ];
 
