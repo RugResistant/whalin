@@ -157,7 +157,6 @@ function TradesPage() {
         return format(new Date(value), 'PP p');
       },
     }),
-    // Optional new column for token amount sold
     columnHelper.accessor('token_amount_sold', {
       header: 'Tokens Sold',
       cell: ({ getValue }) => getValue() || '—',
