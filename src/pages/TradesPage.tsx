@@ -45,7 +45,7 @@ function TradesPage() {
     data: solPrice = 0,
     isLoading: priceLoading,
     error: priceError,
-  } = useQuery({
+  } = useQuery<number>({
     queryKey: ['sol_usd_price'],
     queryFn: async () => {
       const res = await fetch(COINGECKO_API);
