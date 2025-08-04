@@ -2,6 +2,7 @@ import { useTrades } from '../hooks/useData';
 import { format } from 'date-fns';
 import {
   ColumnDef,
+  createColumnHelper,
   flexRender,
   getCoreRowModel,
   useReactTable,
@@ -19,10 +20,10 @@ type Trade = {
     name?: string;
     symbol?: string;
   };
-  buy_price: number;
-  sell_price: number;
-  price_change_percent: number;
-  estimated_profit_sol: number;
+  buy_price: string;
+  sell_price: string;
+  price_change_percent: string;
+  estimated_profit_sol: string;
   buy_timestamp: string | null;
   sell_timestamp: string | null;
 };
@@ -30,10 +31,11 @@ type Trade = {
 function TradesPage() {
   const [copiedMint, setCopiedMint] = useState<string | null>(null);
   const {
-    data = [],
+    data: rawData = [],
     isLoading: tradesLoading,
     error: tradesError,
   } = useTrades();
+  const data = rawData as Trade[];
   const {
     data: solPrice = 0,
     isLoading: priceLoading,
@@ -52,9 +54,9 @@ function TradesPage() {
     setCopiedMint(mint);
     setTimeout(() => setCopiedMint(null), 1500);
   };
-  const columns: ColumnDef<Trade>[] = [
-    {
-      accessorKey: 'token_mint',
+  const columnHelper = createColumnHelper<Trade>();
+  const columns = [
+    columnHelper.accessor('token_mint', {
       header: '🧬 Token',
       cell: ({ row }) => {
         const mint = row.original.token_mint;
@@ -82,32 +84,29 @@ function TradesPage() {
           </div>
         );
       },
-    },
-    {
-      accessorFn: (row) => row.enriched?.symbol ?? '—',
+    }),
+    columnHelper.accessor((row) => row.enriched?.symbol ?? '—', {
+      id: 'symbol',
       header: 'Symbol',
       cell: (info) => <span className="text-sm font-mono">{info.getValue()}</span>,
-    },
-    {
-      accessorKey: 'buy_price',
+    }),
+    columnHelper.accessor('buy_price', {
       header: 'Buy (USD)',
       cell: ({ getValue }) => {
         const val = Number(getValue()) || 0;
         const usd = val * solPrice;
         return usd > 0 ? `$${usd.toFixed(6)}` : '—';
       },
-    },
-    {
-      accessorKey: 'sell_price',
+    }),
+    columnHelper.accessor('sell_price', {
       header: 'Sell (USD)',
       cell: ({ getValue }) => {
         const val = Number(getValue()) || 0;
         const usd = val * solPrice;
         return usd > 0 ? `$${usd.toFixed(6)}` : '—';
       },
-    },
-    {
-      accessorKey: 'price_change_percent',
+    }),
+    columnHelper.accessor('price_change_percent', {
       header: 'Change',
       cell: ({ getValue }) => {
         const change = Number(getValue());
@@ -119,9 +118,8 @@ function TradesPage() {
           </span>
         );
       },
-    },
-    {
-      accessorKey: 'estimated_profit_sol',
+    }),
+    columnHelper.accessor('estimated_profit_sol', {
       header: 'Profit',
       cell: ({ getValue }) => {
         const sol = Number(getValue()) || 0;
@@ -134,25 +132,25 @@ function TradesPage() {
           </span>
         );
       },
-    },
-    {
-      accessorKey: 'buy_timestamp',
+    }),
+    columnHelper.accessor('buy_timestamp', {
       header: 'Buy Time',
       cell: ({ getValue }) => {
         const value = getValue();
-        return value ? format(new Date(value), 'PP p') : '—';
+        if (!value) return '—';
+        return format(new Date(value), 'PP p');
       },
-    },
-    {
-      accessorKey: 'sell_timestamp',
+    }),
+    columnHelper.accessor('sell_timestamp', {
       header: 'Sell Time',
       cell: ({ getValue }) => {
         const value = getValue();
-        return value ? format(new Date(value), 'PP p') : '—';
+        if (!value) return '—';
+        return format(new Date(value), 'PP p');
       },
-    },
+    }),
   ];
-  const table = useReactTable<Trade>({
+  const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
