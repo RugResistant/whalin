@@ -35,7 +35,9 @@ function TrackedTokensPage() {
   } = useQuery<number>({
     queryKey: ['sol_usd_price'],
     queryFn: async () => {
-      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+      const res = await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd'
+      );
       const json = await res.json();
       return json.solana?.usd || 0;
     },
@@ -67,16 +69,16 @@ function TrackedTokensPage() {
     refetchInterval: 10000,
   });
 
-  const columns: ColumnDef<TokenRow>[] = [
+  const columns: ColumnDef<TokenRow, unknown>[] = [
     {
       accessorKey: 'token_mint',
       header: '🧬 Token Mint',
       cell: ({ getValue }) => (
         <a
-          href={`/insights/${getValue()}`}
+          href={`/insights/${String(getValue())}`}
           className="link link-primary break-all"
         >
-          {getValue()}
+          {String(getValue())}
         </a>
       ),
     },
@@ -84,25 +86,27 @@ function TrackedTokensPage() {
       id: 'name',
       header: 'Name',
       accessorFn: (row) => row.enriched?.name || 'Unknown',
-      cell: ({ getValue }) => <span>{getValue()}</span>,
+      cell: ({ getValue }) => <span>{String(getValue())}</span>,
     },
     {
       id: 'symbol',
       header: 'Symbol',
       accessorFn: (row) => row.enriched?.symbol || 'UNK',
-      cell: ({ getValue }) => <span>{getValue()}</span>,
+      cell: ({ getValue }) => <span>{String(getValue())}</span>,
     },
     {
       accessorKey: 'buy_price',
       header: 'Buy Price (SOL)',
-      cell: ({ getValue }) => <span>{getValue<number>().toFixed(10)}</span>,
+      cell: ({ getValue }) =>
+        <span>{(getValue() as number).toFixed(10)}</span>,
     },
     {
       id: 'current_price',
       header: 'Current Price (SOL)',
-      cell: ({ row }) => (
-        <span>{(latestPrices[row.original.token_mint] ?? 0).toFixed(10)}</span>
-      ),
+      cell: ({ row }) => {
+        const current = latestPrices[row.original.token_mint] ?? 0;
+        return <span>{current.toFixed(10)}</span>;
+      },
     },
     {
       id: 'change_percent',
@@ -150,12 +154,12 @@ function TrackedTokensPage() {
       header: 'Buy Signature',
       cell: ({ getValue }) => (
         <a
-          href={`https://solscan.io/tx/${getValue<string>()}`}
+          href={`https://solscan.io/tx/${String(getValue())}`}
           target="_blank"
           rel="noopener noreferrer"
           className="link link-secondary break-all"
         >
-          {getValue<string>().slice(0, 12)}...
+          {String(getValue()).slice(0, 12)}...
         </a>
       ),
     },
@@ -164,7 +168,7 @@ function TrackedTokensPage() {
       header: 'Bought At',
       cell: ({ getValue }) =>
         getValue() ? (
-          <span>{format(new Date(getValue<string>()), 'PPP p')}</span>
+          <span>{format(new Date(String(getValue())), 'PPP p')}</span>
         ) : (
           <span>—</span>
         ),
@@ -194,7 +198,10 @@ function TrackedTokensPage() {
                     <th key={header.id}>
                       {header.isPlaceholder
                         ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
                     </th>
                   ))}
                 </tr>
@@ -205,7 +212,10 @@ function TrackedTokensPage() {
                 <tr key={row.id}>
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </td>
                   ))}
                 </tr>
