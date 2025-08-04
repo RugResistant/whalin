@@ -155,21 +155,30 @@ function BotConfigPage() {
     {
       accessorKey: 'active',
       header: 'Active',
-      cell: ({ row }) => (
-        <label className="cursor-pointer">
-          <input
-            type="checkbox"
-            className="toggle toggle-sm toggle-success"
-            checked={row.original.active}
-            onChange={(e) =>
-              toggleWhale.mutate({
-                address: row.original.address,
-                active: e.target.checked,
-              })
-            }
-          />
-        </label>
-      ),
+      cell: ({ row }) => {
+        const active = row.original.active;
+        const address = row.original.address;
+
+        const handleToggle = () => {
+          toggleWhale.mutate({ address, active: !active });
+        };
+
+        return (
+          <div
+            className="relative inline-block w-10 h-6"
+            onClick={handleToggle}
+          >
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={active}
+              onChange={handleToggle}
+            />
+            <div className="w-10 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition duration-300"></div>
+            <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full transition peer-checked:translate-x-full"></div>
+          </div>
+        );
+      },
     },
     {
       header: 'Actions',
