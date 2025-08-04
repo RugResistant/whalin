@@ -1,4 +1,3 @@
-// src/pages/BotConfigPage.tsx
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -39,8 +38,10 @@ function BotConfigPage() {
   });
 
   const addWhale = useMutation({
-    mutationFn: async (address: string) => {
-      const { error } = await supabase.from('whale_wallets').insert({ address, active: true });
+    mutationFn: async ({ address, description }: { address: string; description: string }) => {
+      const { error } = await supabase
+        .from('whale_wallets')
+        .insert({ address, description, active: true });
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
@@ -97,6 +98,31 @@ function BotConfigPage() {
   const whaleColumns: ColumnDef<any>[] = [
     { accessorKey: 'address', header: 'Address' },
     {
+      accessorKey: 'description',
+      header: 'Description',
+      cell: ({ row }) => {
+        const [localDesc, setLocalDesc] = useState(row.original.description || '');
+
+        return (
+          <input
+            type="text"
+            className="input input-bordered input-sm w-full"
+            value={localDesc}
+            onChange={(e) => setLocalDesc(e.target.value)}
+            onBlur={() => {
+              if (localDesc !== row.original.description) {
+                supabase
+                  .from('whale_wallets')
+                  .update({ description: localDesc })
+                  .eq('address', row.original.address)
+                  .then(() => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }));
+              }
+            }}
+          />
+        );
+      },
+    },
+    {
       accessorKey: 'active',
       header: 'Active',
       cell: ({ row }) => (
@@ -127,10 +153,12 @@ function BotConfigPage() {
   });
 
   const [newWhaleAddress, setNewWhaleAddress] = useState('');
+  const [newWhaleDescription, setNewWhaleDescription] = useState('');
   const handleAddWhale = () => {
     if (newWhaleAddress) {
-      addWhale.mutate(newWhaleAddress);
+      addWhale.mutate({ address: newWhaleAddress, description: newWhaleDescription });
       setNewWhaleAddress('');
+      setNewWhaleDescription('');
     }
   };
 
@@ -187,8 +215,15 @@ function BotConfigPage() {
             type="text"
             value={newWhaleAddress}
             onChange={(e) => setNewWhaleAddress(e.target.value)}
-            placeholder="Add new whale address (e.g., suqh5sHtr8HyJ7q8scBimULPkPpA557prMG47xCHQfK)"
-            className="input input-bordered flex-1"
+            placeholder="Whale address (e.g. 7dkU7s3...)"
+            className="input input-bordered w-1/2"
+          />
+          <input
+            type="text"
+            value={newWhaleDescription}
+            onChange={(e) => setNewWhaleDescription(e.target.value)}
+            placeholder="Description (optional)"
+            className="input input-bordered w-1/2"
           />
           <button className="btn btn-primary" onClick={handleAddWhale}>
             Add
