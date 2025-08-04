@@ -1,8 +1,6 @@
-// src/pages/TradesPage.tsx
 import { useTrades } from '../hooks/useData';
 import { format } from 'date-fns';
 import {
-  ColumnDef,
   createColumnHelper,
   flexRender,
   getCoreRowModel,
@@ -64,8 +62,9 @@ function TradesPage() {
 
   const columnHelper = createColumnHelper<Trade>();
 
-  const columns: ColumnDef<Trade>[] = [
-    columnHelper.accessor('token_mint', {
+  const columns = [
+    columnHelper.accessor((row) => row.token_mint, {
+      id: 'token_mint',
       header: '🧬 Token',
       cell: ({ row }) => {
         const mint = row.original.token_mint;
@@ -97,80 +96,67 @@ function TradesPage() {
     columnHelper.accessor((row) => row.enriched?.symbol ?? '—', {
       id: 'symbol',
       header: 'Symbol',
-      cell: (info) => (
-        <span className="text-sm font-mono">{info.getValue()}</span>
-      ),
+      cell: (info) => <span className="text-sm font-mono">{info.getValue()}</span>,
     }),
-    columnHelper.accessor('buy_price', {
+    columnHelper.accessor((row) => row.buy_price, {
+      id: 'buy_price',
       header: 'Buy (USD)',
       cell: ({ getValue }) => {
         const val = getValue() || 0;
         const usd = val * solPrice;
-        return usd > 0 ? `$${usd.toFixed(6)}` : '—';
+        return <span>{usd > 0 ? `$${usd.toFixed(6)}` : '—'}</span>;
       },
     }),
-    columnHelper.accessor('sell_price', {
+    columnHelper.accessor((row) => row.sell_price, {
+      id: 'sell_price',
       header: 'Sell (USD)',
       cell: ({ getValue }) => {
         const val = getValue() || 0;
         const usd = val * solPrice;
-        return usd > 0 ? `$${usd.toFixed(6)}` : '—';
+        return <span>{usd > 0 ? `$${usd.toFixed(6)}` : '—'}</span>;
       },
     }),
-    columnHelper.accessor('price_change_percent', {
+    columnHelper.accessor((row) => row.price_change_percent, {
+      id: 'price_change_percent',
       header: 'Change',
       cell: ({ getValue }) => {
         const change = getValue() || 0;
         const emoji = change > 0 ? '🚀' : change < 0 ? '💀' : '';
-        const color =
-          change > 0
-            ? 'text-green-500'
-            : change < 0
-            ? 'text-red-500'
-            : 'text-base-content';
-        return (
-          <span className={`font-medium ${color}`}>
-            {emoji} {change.toFixed(2)}%
-          </span>
-        );
+        const color = change > 0 ? 'text-green-500' : change < 0 ? 'text-red-500' : 'text-base-content';
+        return <span className={`font-medium ${color}`}>{emoji} {change.toFixed(2)}%</span>;
       },
     }),
-    columnHelper.accessor('estimated_profit_sol', {
+    columnHelper.accessor((row) => row.estimated_profit_sol, {
+      id: 'estimated_profit_sol',
       header: 'Profit',
       cell: ({ getValue }) => {
         const sol = getValue() || 0;
         const usd = sol * solPrice;
         const emoji = usd > 0 ? '🟢' : usd < 0 ? '🔴' : '';
-        const color =
-          usd > 0
-            ? 'text-green-500'
-            : usd < 0
-            ? 'text-red-500'
-            : 'text-base-content';
-        return (
-          <span className={`font-semibold ${color}`}>
-            {emoji} {usd !== 0 ? `$${usd.toFixed(6)}` : '—'}
-          </span>
-        );
+        const color = usd > 0 ? 'text-green-500' : usd < 0 ? 'text-red-500' : 'text-base-content';
+        return <span className={`font-semibold ${color}`}>{emoji} {usd !== 0 ? `$${usd.toFixed(6)}` : '—'}</span>;
       },
     }),
-    columnHelper.accessor('buy_timestamp', {
+    columnHelper.accessor((row) => row.buy_timestamp, {
+      id: 'buy_timestamp',
       header: 'Buy Time',
       cell: ({ getValue }) => {
         const value = getValue();
-        return value ? format(new Date(value), 'PP p') : '—';
+        return <span>{value ? format(new Date(value), 'PP p') : '—'}</span>;
       },
     }),
-    columnHelper.accessor('sell_timestamp', {
+    columnHelper.accessor((row) => row.sell_timestamp, {
+      id: 'sell_timestamp',
       header: 'Sell Time',
       cell: ({ getValue }) => {
         const value = getValue();
-        return value ? format(new Date(value), 'PP p') : '—';
+        return <span>{value ? format(new Date(value), 'PP p') : '—'}</span>;
       },
     }),
-    columnHelper.accessor('token_amount_sold', {
+    columnHelper.accessor((row) => row.token_amount_sold, {
+      id: 'token_amount_sold',
       header: 'Tokens Sold',
-      cell: ({ getValue }) => getValue() ?? '—',
+      cell: ({ getValue }) => <span>{getValue() ?? '—'}</span>,
     }),
   ];
 
@@ -189,9 +175,7 @@ function TradesPage() {
         </div>
       )}
       {(tradesError || priceError) && (
-        <div className="alert alert-error">
-          Failed to load trades or SOL price.
-        </div>
+        <div className="alert alert-error">Failed to load trades or SOL price.</div>
       )}
       {!tradesLoading && !tradesError && !priceLoading && !priceError && (
         <div className="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
@@ -201,12 +185,7 @@ function TradesPage() {
                 <tr key={group.id}>
                   {group.headers.map((header) => (
                     <th key={header.id} className="px-4 py-2">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
                   ))}
                 </tr>
@@ -217,10 +196,7 @@ function TradesPage() {
                 <tr key={row.id} className="hover:bg-base-200 transition">
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-4 py-2 whitespace-nowrap">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
                 </tr>
