@@ -1,4 +1,3 @@
-// src/hooks/useData.ts
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { enrichTokenMint } from '../lib/moralis';
@@ -32,6 +31,7 @@ export function useTrades() {
       if (!data) return [];
       return Promise.all(data.map(async (row) => ({ ...row, enriched: await enrichTokenMint(row.token_mint) })));
     },
+    refetchInterval: 10000, // Auto-refresh every 10 seconds for real-time updates
   });
 }
 
