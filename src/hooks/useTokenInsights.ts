@@ -9,8 +9,6 @@ export interface TokenInsights {
   marketCap?: number;
   price?: number;
   holders?: number;
-  volume?: number;
-  createdAt?: string;
   ohlcv?: any[];
   swapVolumes?: any[];
   logs?: any[];
@@ -103,10 +101,8 @@ export function useTokenInsights(tokenMint: string) {
         name: meta.name,
         symbol: meta.symbol,
         price: Number(priceData.usdPrice) || 0,
-        marketCap: Number(priceData.fullyDilutedValue) || 0,
+        marketCap: Number(meta.fullyDilutedValue) || 0, // ✅ updated to use fullyDilutedValue from metadata
         holders,
-        volume: Number(priceData.total24hVolumeUsd) || 0,
-        createdAt: meta.createdAt || null,
         ohlcv,
         swapVolumes: [],
         logs,
