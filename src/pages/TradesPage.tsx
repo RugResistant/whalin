@@ -8,20 +8,18 @@ import {
 } from '@tanstack/react-table';
 import { useQuery } from '@tanstack/react-query';
 import { ClipboardCopy, CheckCircle2 } from 'lucide-react';
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 
 const COINGECKO_API =
   'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd';
 
 function TradesPage() {
   const [copiedMint, setCopiedMint] = useState<string | null>(null);
-
   const {
     data = [],
     isLoading: tradesLoading,
     error: tradesError,
   } = useTrades();
-
   const {
     data: solPrice = 0,
     isLoading: priceLoading,
@@ -35,13 +33,11 @@ function TradesPage() {
     },
     refetchInterval: 60000,
   });
-
   const handleCopy = async (mint: string) => {
     await navigator.clipboard.writeText(mint);
     setCopiedMint(mint);
     setTimeout(() => setCopiedMint(null), 1500);
   };
-
   const columns: ColumnDef<any>[] = [
     {
       accessorKey: 'token_mint',
@@ -138,17 +134,14 @@ function TradesPage() {
         getValue() ? format(new Date(getValue<string>()), 'PP p') : '—',
     },
   ];
-
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
-
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
       <h1 className="text-3xl font-bold">💸 Trade History</h1>
-
       {(tradesLoading || priceLoading) && (
         <div className="text-center py-8">
           <span className="loading loading-spinner text-primary" />
@@ -159,7 +152,6 @@ function TradesPage() {
           Failed to load trades or SOL price.
         </div>
       )}
-
       {!tradesLoading && !tradesError && !priceLoading && !priceError && (
         <div className="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
           <table className="table table-sm w-full">
@@ -173,7 +165,7 @@ function TradesPage() {
                         : flexRender(
                             header.column.columnDef.header,
                             header.getContext()
-                          ) as React.ReactElement | null}
+                          ) as ReactNode}
                     </th>
                   ))}
                 </tr>
@@ -187,7 +179,7 @@ function TradesPage() {
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
-                      ) as React.ReactElement | null}
+                      ) as ReactNode}
                     </td>
                   ))}
                 </tr>
@@ -199,5 +191,4 @@ function TradesPage() {
     </div>
   );
 }
-
 export default TradesPage;
