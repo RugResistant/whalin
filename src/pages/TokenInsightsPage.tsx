@@ -1,16 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useTokenInsights } from '../hooks/useTokenInsights';
 import { Card, CardContent } from '../components/ui/card';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-} from 'recharts';
 import { format } from 'date-fns';
 
 function TokenInsightsPage() {
@@ -55,56 +45,8 @@ function TokenInsightsPage() {
                 : '–'
             }
           />
-          <Stat
-            label="📈 Volume (24h)"
-            value={
-              typeof data.volume === 'number'
-                ? `$${data.volume.toLocaleString()}`
-                : '–'
-            }
-          />
-          <Stat
-            label="🚀 Launch Date"
-            value={
-              data.createdAt
-                ? format(new Date(data.createdAt), 'PPP')
-                : '–'
-            }
-          />
         </CardContent>
       </Card>
-
-      {Array.isArray(data.ohlcv) && data.ohlcv.length > 0 && (
-        <Card>
-          <CardContent className="p-4 space-y-4">
-            <h2 className="text-xl font-semibold">📉 OHLCV Chart</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={data.ohlcv}>
-                <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'p')} />
-                <YAxis domain={['auto', 'auto']} />
-                <Tooltip />
-                <Line type="monotone" dataKey="close" stroke="#8884d8" dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {Array.isArray(data.swapVolumes) && data.swapVolumes.length > 0 && (
-        <Card>
-          <CardContent className="p-4 space-y-4">
-            <h2 className="text-xl font-semibold">💱 Swap Volume (24h)</h2>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={data.swapVolumes}>
-                <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'p')} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="volume" fill="#22c55e" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
 
       {Array.isArray(data.logs) && data.logs.length > 0 && (
         <Card>
