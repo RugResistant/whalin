@@ -17,11 +17,12 @@ import {
   Save,
   Trash2,
   PlusCircle,
-  Coins,  // New icon for tracked tokens
+  Coins, // New icon for tracked tokens
 } from 'lucide-react';
 
 function BotConfigPage() {
   const queryClient = useQueryClient();
+
   const { data: configs = [], isLoading: configsLoading } = useQuery({
     queryKey: ['bot_configs'],
     queryFn: async () => {
@@ -30,6 +31,7 @@ function BotConfigPage() {
       return data;
     },
   });
+
   const { data: whales = [], isLoading: whalesLoading } = useQuery({
     queryKey: ['whale_wallets'],
     queryFn: async () => {
@@ -38,6 +40,17 @@ function BotConfigPage() {
       return data;
     },
   });
+
+  // New: Query for strategy configs
+  const { data: strategyConfigs = [], isLoading: strategyLoading } = useQuery({
+    queryKey: ['strategy_configs'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('strategy_config').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // New: Query for tracked tokens
   const { data: trackedTokens = [], isLoading: trackedLoading } = useQuery({
     queryKey: ['tracked_tokens'],
@@ -47,6 +60,7 @@ function BotConfigPage() {
       return data;
     },
   });
+
   // New: Query for immediate sells (to show status)
   const { data: immediateSells = [] } = useQuery({
     queryKey: ['immediate_sells'],
@@ -56,6 +70,7 @@ function BotConfigPage() {
       return data;
     },
   });
+
   const updateConfig = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
       const { error } = await supabase
@@ -66,6 +81,19 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bot_configs'] }),
   });
+
+  // New: Mutation to update strategy config
+  const updateStrategyConfig = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: string }) => {
+      const { error } = await supabase
+        .from('strategy_config')
+        .update({ value })
+        .eq('key', key);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['strategy_configs'] }),
+  });
+
   const addWhale = useMutation({
     mutationFn: async ({ address, description }: { address: string; description: string }) => {
       const { error } = await supabase
@@ -75,6 +103,7 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
   });
+
   const toggleWhale = useMutation({
     mutationFn: async ({ address, active }: { address: string; active: boolean }) => {
       const { error } = await supabase
@@ -85,6 +114,7 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
   });
+
   const deleteWhale = useMutation({
     mutationFn: async (address: string) => {
       const { error } = await supabase
@@ -95,6 +125,7 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
   });
+
   // New: Mutation to trigger immediate sell
   const triggerImmediateSell = useMutation({
     mutationFn: async (tokenMint: string) => {
@@ -108,6 +139,7 @@ function BotConfigPage() {
       queryClient.invalidateQueries({ queryKey: ['tracked_tokens'] });
     },
   });
+
   const configColumns: ColumnDef<any>[] = [
     { accessorKey: 'key', header: 'Key' },
     { accessorKey: 'description', header: 'Description' },
@@ -139,6 +171,40 @@ function BotConfigPage() {
       },
     },
   ];
+
+  // New: Columns for strategy configs (similar to configs)
+  const strategyColumns: ColumnDef<any>[] = [
+    { accessorKey: 'key', header: 'Key' },
+    { accessorKey: 'description', header: 'Description' },
+    {
+      accessorKey: 'value',
+      header: 'Value',
+      cell: ({ row }) => {
+        const [localValue, setLocalValue] = useState(row.original.value || '');
+        const [dirty, setDirty] = useState(false);
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              className="input input-sm input-bordered w-full"
+              value={localValue}
+              onChange={(e) => {
+                setLocalValue(e.target.value);
+                setDirty(true);
+              }}
+              onBlur={() => {
+                if (dirty && localValue !== row.original.value) {
+                  updateStrategyConfig.mutate({ key: row.original.key, value: localValue });
+                  setDirty(false);
+                }
+              }}
+            />
+            {dirty && <Save className="w-4 h-4 text-blue-500" />}
+          </div>
+        );
+      },
+    },
+  ];
+
   const whaleColumns: ColumnDef<any>[] = [
     { accessorKey: 'address', header: 'Address' },
     {
@@ -212,6 +278,7 @@ function BotConfigPage() {
       ),
     },
   ];
+
   // New: Columns for tracked tokens table
   const trackedColumns: ColumnDef<any>[] = [
     { accessorKey: 'token_mint', header: 'Token Mint' },
@@ -240,24 +307,36 @@ function BotConfigPage() {
       },
     },
   ];
+
   const configTable = useReactTable({
     data: configs,
     columns: configColumns,
     getCoreRowModel: getCoreRowModel(),
   });
+
+  // New: Table for strategy configs
+  const strategyTable = useReactTable({
+    data: strategyConfigs,
+    columns: strategyColumns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
   const whaleTable = useReactTable({
     data: whales,
     columns: whaleColumns,
     getCoreRowModel: getCoreRowModel(),
   });
+
   // New: Table for tracked tokens
   const trackedTable = useReactTable({
     data: trackedTokens,
     columns: trackedColumns,
     getCoreRowModel: getCoreRowModel(),
   });
+
   const [newWhaleAddress, setNewWhaleAddress] = useState('');
   const [newWhaleDescription, setNewWhaleDescription] = useState('');
+
   const handleAddWhale = () => {
     if (newWhaleAddress) {
       addWhale.mutate({
@@ -268,13 +347,15 @@ function BotConfigPage() {
       setNewWhaleDescription('');
     }
   };
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-10">
       <div className="flex items-center gap-3">
         <Settings className="w-6 h-6 text-primary" />
         <h1 className="text-3xl font-bold">Bot Configuration</h1>
       </div>
-      {/* CONFIGS */}
+
+      {/* GLOBAL CONFIGS */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-2xl font-semibold flex items-center gap-2 mb-4">
@@ -315,6 +396,49 @@ function BotConfigPage() {
           )}
         </div>
       </div>
+
+      {/* NEW: SELL STRATEGY CONFIGS */}
+      <div className="card bg-base-100 border border-base-300 shadow-md">
+        <div className="card-body">
+          <h2 className="text-2xl font-semibold flex items-center gap-2 mb-4">
+            <Settings className="w-5 h-5" />
+            Sell Strategy Configs
+          </h2>
+          {strategyLoading ? (
+            <div className="loading loading-spinner text-primary" />
+          ) : strategyConfigs.length === 0 ? (
+            <p className="text-sm text-gray-500">No strategy configs found.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table table-sm table-auto w-full">
+                <thead className="bg-base-200">
+                  {strategyTable.getHeaderGroups().map((group) => (
+                    <tr key={group.id}>
+                      {group.headers.map((header) => (
+                        <th key={header.id}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {strategyTable.getRowModel().rows.map((row) => (
+                    <tr key={row.id}>
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* WHALES */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body space-y-4">
@@ -381,7 +505,8 @@ function BotConfigPage() {
           )}
         </div>
       </div>
-      {/* New: TRACKED TOKENS */}
+
+      {/* TRACKED TOKENS */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body space-y-4">
           <div className="flex items-center justify-between">
@@ -430,4 +555,5 @@ function BotConfigPage() {
     </div>
   );
 }
+
 export default BotConfigPage;
