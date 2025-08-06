@@ -421,9 +421,9 @@ function BotConfigPage() {
 });
 
   const strategyConfigs: StrategyRow[] = strategyConfigsRaw ?? [];
-  const trailingKeys = strategyConfigs.filter((cfg) => cfg.key.startsWith('trailing_'));
-  const simpleKeys = strategyConfigs.filter((cfg) => cfg.key.startsWith('simple_'));
-  const activeKeys = activeStrategy === 'trailing' ? trailingKeys : simpleKeys;
+const trailingKeys = strategyConfigs.filter((cfg) => cfg.key.startsWith('trailing_'));
+const simpleKeys = strategyConfigs.filter((cfg) => cfg.key.startsWith('simple_'));
+const activeKeys = activeStrategy === 'trailing' ? trailingKeys : simpleKeys;
 
   const handleAddWhale = () => {
     if (newWhaleAddress) {
