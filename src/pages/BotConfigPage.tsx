@@ -107,6 +107,170 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+// Separate component for editable text/number field
+function EditableField({ row, isBotConfig = false, isDescription = false, onSave }: { row: StrategyRow | BotConfigRow, isBotConfig?: boolean, isDescription?: boolean, onSave: (value: string) => void }) {
+  const key = row.key;
+  const rawValue = isDescription ? (row as BotConfigRow).description : row.value;
+  const [localValue, setLocalValue] = useState(rawValue);
+  const [error, setError] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+
+  const validateInput = (value: string) => {
+    if (key.includes('ratio') || key.includes('multiple') || key.includes('cushion')) {
+      const num = parseFloat(value);
+      if (isNaN(num) || num <= 0) {
+        return 'Must be a positive number';
+      }
+      if (key.includes('stop_loss_ratio') && num >= 1) {
+        return 'Stop loss ratio must be less than 1';
+      }
+    }
+    if (key.includes('percent') && !key.includes('take_profit')) {
+      const num = parseFloat(value);
+      if (isNaN(num) || num < 0 || num > 100) {
+        return 'Must be between 0 and 100';
+      }
+    }
+    return null;
+  };
+
+  const save = () => {
+    const validationError = validateInput(localValue);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    onSave(localValue);
+    setError(null);
+    setDirty(false);
+  };
+
+  return (
+    <div className="form-control">
+      <input
+        type={key.includes('percent') || key.includes('ratio') || key.includes('multiple') || key.includes('cushion') ? 'number' : 'text'}
+        step={key.includes('percent') ? '1' : '0.1'}
+        min={key.includes('percent') ? '0' : key.includes('stop_loss_ratio') ? '0' : '1'}
+        max={key.includes('percent') ? '100' : undefined}
+        className={`input input-sm input-bordered w-48 ${error ? 'input-error' : ''}`}
+        value={localValue}
+        onChange={(e) => {
+          setLocalValue(e.target.value);
+          setError(null);
+          setDirty(true);
+        }}
+        onBlur={() => {
+          if (dirty && localValue !== rawValue) {
+            save();
+          } else if (dirty) {
+            setDirty(false);
+          }
+        }}
+      />
+      {error && <p className="text-xs text-error mt-1">{error}</p>}
+      {dirty && <Save className="w-4 h-4 text-green-500 cursor-pointer mt-1" onClick={save} />}
+    </div>
+  );
+}
+
+// Separate component for editable take-profit levels
+function EditableTakeProfit({ row, onSave }: { row: StrategyRow, onSave: (value: string) => void }) {
+  const [localValue, setLocalValue] = useState(row.value);
+  const [error, setError] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const parsed = parseTakeProfit(localValue);
+
+  const save = () => {
+    onSave(localValue);
+    setError(null);
+    setDirty(false);
+  };
+
+  return (
+    <div className="flex flex-col gap-2 p-2 border rounded-md bg-base-200">
+      <div className="text-sm font-medium">Profit Levels:</div>
+      {parsed.length === 0 && <p className="text-sm text-gray-500">No profit levels configured.</p>}
+      {parsed.map((tp, idx) => (
+        <div key={idx} className="flex gap-2 items-center">
+          <div className="form-control w-24">
+            <label className="label text-xs">Multiple/Ratio</label>
+            <input
+              type="number"
+              step="0.1"
+              min="1"
+              className="input input-xs input-bordered"
+              value={tp.multiple ?? tp.ratio ?? 1}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (isNaN(value) || value < 1) {
+                  setError('Multiple/Ratio must be at least 1');
+                  return;
+                }
+                const updated = [...parsed];
+                if (tp.multiple !== undefined) updated[idx].multiple = value;
+                if (tp.ratio !== undefined) updated[idx].ratio = value;
+                setLocalValue(JSON.stringify(updated));
+                setError(null);
+                setDirty(true);
+              }}
+            />
+          </div>
+          <div className="form-control w-24">
+            <label className="label text-xs">Sell %</label>
+            <input
+              type="number"
+              step="1"
+              min="0"
+              max="100"
+              className="input input-xs input-bordered"
+              value={tp.percent ?? 0}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (isNaN(value) || value < 0 || value > 100) {
+                  setError('Percent must be between 0 and 100');
+                  return;
+                }
+                const updated = [...parsed];
+                updated[idx].percent = value;
+                setLocalValue(JSON.stringify(updated));
+                setError(null);
+                setDirty(true);
+              }}
+            />
+          </div>
+          <button
+            className="btn btn-xs btn-error mt-5"
+            onClick={() => {
+              const updated = parsed.filter((_, i) => i !== idx);
+              setLocalValue(JSON.stringify(updated));
+              setDirty(true);
+            }}
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      ))}
+      <button
+        className="btn btn-xs btn-outline mt-2"
+        onClick={() => {
+          const field = row.key.includes('steps') ? 'ratio' : 'multiple';
+          const newParsed = [...parsed, { [field]: 2, percent: 10 }];
+          setLocalValue(JSON.stringify(newParsed));
+          setDirty(true);
+        }}
+      >
+        + Add Profit Level
+      </button>
+      {error && <p className="text-xs text-error mt-1">{error}</p>}
+      {dirty && (
+        <button className="btn btn-xs btn-primary mt-2" onClick={save}>
+          Save Levels
+        </button>
+      )}
+    </div>
+  );
+}
+
 function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
@@ -196,169 +360,6 @@ function BotConfigPage() {
   const simpleKeys = strategyConfigs.filter((cfg) => cfg.key.startsWith('simple_'));
   const activeKeys = activeStrategy === 'trailing' ? trailingKeys : simpleKeys;
 
-  const renderEditableRow = (row: StrategyRow | BotConfigRow, isBotConfig = false, isDescription = false) => {
-    const key = row.key;
-    const rawValue = isDescription ? (row as BotConfigRow).description : row.value;
-    const [localValue, setLocalValue] = useState(rawValue);
-    const [error, setError] = useState<string | null>(null);
-    const [dirty, setDirty] = useState(false);
-
-    const validateInput = (value: string) => {
-      if (key.includes('ratio') || key.includes('multiple') || key.includes('cushion')) {
-        const num = parseFloat(value);
-        if (isNaN(num) || num <= 0) {
-          return 'Must be a positive number';
-        }
-        if (key.includes('stop_loss_ratio') && num >= 1) {
-          return 'Stop loss ratio must be less than 1';
-        }
-      }
-      if (key.includes('percent') && !key.includes('take_profit')) {
-        const num = parseFloat(value);
-        if (isNaN(num) || num < 0 || num > 100) {
-          return 'Must be between 0 and 100';
-        }
-      }
-      return null;
-    };
-
-    const save = () => {
-      const validationError = validateInput(localValue);
-      if (validationError) {
-        setError(validationError);
-        return;
-      }
-      if (isBotConfig) {
-        updateBotConfig.mutate({
-          key,
-          value: isDescription ? (row as BotConfigRow).value : localValue,
-          description: isDescription ? localValue : (row as BotConfigRow).description,
-        });
-      } else {
-        updateStrategyConfig.mutate({ key, value: localValue });
-      }
-      setError(null);
-      setDirty(false);
-    };
-
-    if (key.includes('take_profit_levels') || key.includes('take_profit_steps')) {
-      const parsed = parseTakeProfit(localValue);
-      return (
-        <div className="flex flex-col gap-2 p-2 border rounded-md bg-base-200">
-          <div className="text-sm font-medium">Profit Levels:</div>
-          {parsed.length === 0 && <p className="text-sm text-gray-500">No profit levels configured.</p>}
-          {parsed.map((tp, idx) => (
-            <div key={idx} className="flex gap-2 items-center">
-              <div className="form-control w-24">
-                <label className="label text-xs">Multiple/Ratio</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="1"
-                  className={`input input-xs input-bordered ${error ? 'input-error' : ''}`}
-                  value={tp.multiple ?? tp.ratio ?? 1}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    if (isNaN(value) || value < 1) {
-                      setError('Multiple/Ratio must be at least 1');
-                      return;
-                    }
-                    const updated = [...parsed];
-                    if (key.includes('take_profit_levels')) {
-                      updated[idx].multiple = value;
-                    } else {
-                      updated[idx].ratio = value;
-                    }
-                    setLocalValue(JSON.stringify(updated));
-                    setError(null);
-                    setDirty(true);
-                  }}
-                />
-              </div>
-              <div className="form-control w-24">
-                <label className="label text-xs">Sell %</label>
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  max="100"
-                  className={`input input-xs input-bordered ${error ? 'input-error' : ''}`}
-                  value={tp.percent ?? 0}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    if (isNaN(value) || value < 0 || value > 100) {
-                      setError('Percent must be between 0 and 100');
-                      return;
-                    }
-                    const updated = [...parsed];
-                    updated[idx].percent = value;
-                    setLocalValue(JSON.stringify(updated));
-                    setError(null);
-                    setDirty(true);
-                  }}
-                />
-              </div>
-              <button
-                className="btn btn-xs btn-error mt-5"
-                onClick={() => {
-                  const updated = parsed.filter((_, i) => i !== idx);
-                  setLocalValue(JSON.stringify(updated));
-                  setDirty(true);
-                }}
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-          <button
-            className="btn btn-xs btn-outline mt-2"
-            onClick={() => {
-              const field = key.includes('steps') ? 'ratio' : 'multiple';
-              const newParsed = [...parsed, { [field]: 2, percent: 10 }];
-              setLocalValue(JSON.stringify(newParsed));
-              setDirty(true);
-            }}
-          >
-            + Add Profit Level
-          </button>
-          {error && <p className="text-xs text-error mt-1">{error}</p>}
-          {dirty && (
-            <button className="btn btn-xs btn-primary mt-2" onClick={save}>
-              Save Levels
-            </button>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <div className="form-control">
-        <input
-          type={key.includes('percent') || key.includes('ratio') || key.includes('multiple') || key.includes('cushion') ? 'number' : 'text'}
-          step={key.includes('percent') ? '1' : '0.1'}
-          min={key.includes('percent') ? '0' : key.includes('stop_loss_ratio') ? '0' : '1'}
-          max={key.includes('percent') ? '100' : undefined}
-          className={`input input-sm input-bordered w-48 ${error ? 'input-error' : ''}`}
-          value={localValue}
-          onChange={(e) => {
-            setLocalValue(e.target.value);
-            setError(null);
-            setDirty(true);
-          }}
-          onBlur={() => {
-            if (dirty && localValue !== rawValue) {
-              save();
-            } else if (dirty) {
-              setDirty(false);
-            }
-          }}
-        />
-        {error && <p className="text-xs text-error mt-1">{error}</p>}
-        {dirty && <Save className="w-4 h-4 text-green-500 cursor-pointer mt-2" onClick={save} />}
-      </div>
-    );
-  };
-
   const handleAddWhale = () => {
     if (newWhaleAddress) {
       addWhale.mutate({ address: newWhaleAddress, description: newWhaleDescription });
@@ -393,9 +394,13 @@ function BotConfigPage() {
                 <tbody>
                   {botConfigs.map((row, i) => (
                     <tr key={i}>
-                      <td className="font-medium">{displayLabel(row.key)}</td>
-                      <td>{renderEditableRow(row, true)}</td>
-                      <td className="text-sm text-gray-500">{row.description}</td>
+                      <td className="font-medium">{row.key}</td>
+                      <td>
+                        <EditableField row={row} isBotConfig={true} isDescription={false} onSave={(value) => updateBotConfig.mutate({ key: row.key, value, description: row.description })} />
+                      </td>
+                      <td>
+                        <EditableField row={row} isBotConfig={true} isDescription={true} onSave={(description) => updateBotConfig.mutate({ key: row.key, value: row.value, description })} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -576,7 +581,13 @@ function BotConfigPage() {
                               </div>
                             </div>
                           </td>
-                          <td>{renderEditableRow(row)}</td>
+                          <td>
+                            {row.key.includes('take_profit_levels') || row.key.includes('take_profit_steps') ? (
+                              <EditableTakeProfit row={row} onSave={(value) => updateStrategyConfig.mutate({ key: row.key, value })} />
+                            ) : (
+                              <EditableField row={row} onSave={(value) => updateStrategyConfig.mutate({ key: row.key, value })} />
+                            )}
+                          </td>
                           <td className="text-sm text-gray-500">{getTooltip(row.key)}</td>
                         </tr>
                       ))
