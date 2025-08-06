@@ -408,12 +408,17 @@ function BotConfigPage() {
   });
 
   const updateStrategyConfig = useMutation({
-    mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const { error } = await supabase.from('strategy_config').upsert({ key, value });
-      if (error) throw error;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['strategy_configs'] }),
-  });
+  mutationFn: async ({ key, value }: { key: string; value: string }) => {
+    const current = strategyConfigs.find((cfg) => cfg.key === key);
+    const { error } = await supabase.from('strategy_config').upsert({
+      key,
+      value,
+      description: current?.description ?? '',
+    });
+    if (error) throw error;
+  },
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['strategy_configs'] }),
+});
 
   const strategyConfigs: StrategyRow[] = strategyConfigsRaw ?? [];
   const trailingKeys = strategyConfigs.filter((cfg) => cfg.key.startsWith('trailing_'));
