@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Component, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   useQuery,
@@ -35,7 +35,9 @@ type StrategyRow = {
 
 function parseTakeProfit(value: string): { multiple?: number; ratio?: number; percent: number }[] {
   try {
-    return JSON.parse(value);
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(item => (item.multiple || item.ratio) && typeof item.percent === 'number');
   } catch {
     return [];
   }
@@ -68,7 +70,26 @@ function getTooltip(key: string): string {
     simple_partial_sell_percent_at_take_profit: 'Percentage of position to sell at the take profit ratio (e.g., 50 means sell 50% of tokens).',
     simple_take_profit_steps: 'Additional take profit steps (e.g., sell 30% at 3x buy price). Executed in order as price hits each ratio.',
   };
-  return tips[key] || '';
+  return tips[key] || 'No description available.';
+}
+
+// Error Boundary Component
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="alert alert-error">Something went wrong rendering this section. Please refresh.</div>;
+    }
+    return this.props.children;
+  }
 }
 
 function BotConfigPage() {
@@ -210,6 +231,7 @@ function BotConfigPage() {
       return (
         <div className="flex flex-col gap-2 p-2 border rounded-md bg-base-200">
           <div className="text-sm font-medium">Profit Levels:</div>
+          {parsed.length === 0 && <p className="text-sm text-gray-500">No profit levels configured.</p>}
           {parsed.map((tp, idx) => (
             <div key={idx} className="flex gap-2 items-center">
               <div className="form-control w-24">
@@ -219,7 +241,7 @@ function BotConfigPage() {
                   step="0.1"
                   min="1"
                   className="input input-xs input-bordered"
-                  value={tp.multiple ?? tp.ratio}
+                  value={tp.multiple ?? tp.ratio ?? 1}
                   onChange={(e) => {
                     const value = parseFloat(e.target.value);
                     if (isNaN(value) || value < 1) {
@@ -243,7 +265,7 @@ function BotConfigPage() {
                   min="0"
                   max="100"
                   className="input input-xs input-bordered"
-                  value={tp.percent}
+                  value={tp.percent ?? 0}
                   onChange={(e) => {
                     const value = parseFloat(e.target.value);
                     if (isNaN(value) || value < 0 || value > 100) {
@@ -294,7 +316,7 @@ function BotConfigPage() {
     return (
       <div className="form-control">
         <input
-          type="number"
+          type="text"
           step={key.includes('percent') ? '1' : '0.1'}
           min={key.includes('percent') ? '0' : key.includes('stop_loss_ratio') ? '0' : '1'}
           max={key.includes('percent') ? '100' : undefined}
@@ -333,172 +355,15 @@ function BotConfigPage() {
       </div>
 
       {/* Bot Configurations Section */}
-      <div className="card bg-base-100 border border-base-300 shadow-md">
-        <div className="card-body">
-          <h2 className="text-xl font-semibold mb-4">Bot Configurations</h2>
-          {botConfigsLoading ? (
-            <div className="loading loading-spinner text-primary" />
-          ) : (
-            <table className="table table-sm w-full">
-              <thead className="bg-base-200">
-                <tr>
-                  <th>Setting</th>
-                  <th>Value</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(botConfigs || []).map((row, i) => (
-                  <tr key={i}>
-                    <td className="font-medium">{row.key}</td>
-                    <td>{renderEditableRow(row, true)}</td>
-                    <td>{renderEditableRow(row, true, true)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {/* Whale Wallets Section */}
-      <div className="card bg-base-100 border border-base-300 shadow-md">
-        <div className="card-body">
-          <h2 className="text-xl font-semibold mb-4">Whale Wallets</h2>
-          {whaleWalletsLoading ? (
-            <div className="loading loading-spinner text-primary" />
-          ) : (
-            <>
-              <table className="table table-sm w-full">
-                <thead className="bg-base-200">
-                  <tr>
-                    <th>Address</th>
-                    <th>Description</th>
-                    <th>Active</th>
-                    <th>Added At</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(whaleWallets || []).map((row, i) => {
-                    const [localAddress, setLocalAddress] = useState(row.address);
-                    const [localDescription, setLocalDescription] = useState(row.description);
-                    const [localActive, setLocalActive] = useState(row.active);
-                    const save = (field: 'address' | 'description' | 'active') => {
-                      updateWhale.mutate({
-                        address: field === 'address' ? localAddress : row.address,
-                        description: field === 'description' ? localDescription : row.description,
-                        active: field === 'active' ? localActive : row.active,
-                      });
-                    };
-                    return (
-                      <tr key={i}>
-                        <td>
-                          <input
-                            className="input input-sm input-bordered w-full"
-                            value={localAddress}
-                            onChange={(e) => setLocalAddress(e.target.value)}
-                            onBlur={() => save('address')}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            className="input input-sm input-bordered w-full"
-                            value={localDescription}
-                            onChange={(e) => setLocalDescription(e.target.value)}
-                            onBlur={() => save('description')}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-sm"
-                            checked={localActive}
-                            onChange={(e) => {
-                              setLocalActive(e.target.checked);
-                              save('active');
-                            }}
-                          />
-                        </td>
-                        <td>{new Date(row.added_at).toLocaleString()}</td>
-                        <td>
-                          <button
-                            className="btn btn-xs btn-error"
-                            onClick={() => deleteWhale.mutate(row.address)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <div className="mt-4 flex gap-4 items-end">
-                <div className="form-control flex-1">
-                  <label className="label text-sm">New Wallet Address</label>
-                  <input
-                    className="input input-sm input-bordered w-full"
-                    value={newWhaleAddress}
-                    onChange={(e) => setNewWhaleAddress(e.target.value)}
-                    placeholder="Enter wallet address"
-                  />
-                </div>
-                <div className="form-control flex-1">
-                  <label className="label text-sm">Description</label>
-                  <input
-                    className="input input-sm input-bordered w-full"
-                    value={newWhaleDescription}
-                    onChange={(e) => setNewWhaleDescription(e.target.value)}
-                    placeholder="Optional description"
-                  />
-                </div>
-                <button className="btn btn-xs btn-outline" onClick={handleAddWhale}>
-                  <PlusCircle className="w-4 h-4 mr-2" />
-                  Add Wallet
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Trading Strategies Section */}
-      <div className="card bg-base-100 border border-base-300 shadow-md">
-        <div className="card-body">
-          <h2 className="text-xl font-semibold mb-4">Trading Strategies</h2>
-          {strategyConfigsLoading ? (
-            <div className="loading loading-spinner text-primary" />
-          ) : (
-            <>
-              <div className="form-control mb-4">
-                <label className="label font-medium">Active Strategy</label>
-                <div className="flex gap-3">
-                  {['trailing', 'simple'].map((type) => (
-                    <label key={type} className="label cursor-pointer flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="strategy"
-                        className="radio radio-primary"
-                        checked={activeStrategy === type}
-                        onChange={() => {
-                          setActiveStrategy(type);
-                          updateStrategyConfig.mutate({ key: 'active_strategy', value: type });
-                        }}
-                      />
-                      <span className="label-text capitalize">{type}</span>
-                    </label>
-                  ))}
-                </div>
-                <p className="text-sm text-gray-500 mt-1">
-                  {activeStrategy === 'trailing'
-                    ? 'Advanced strategy with trailing stop loss, take profits, and capital recovery.'
-                    : 'Simple strategy with fixed stop loss and take profit levels.'}
-                </p>
-              </div>
-              <h3 className="text-lg font-medium mb-2">
-                {activeStrategy.charAt(0).toUpperCase() + activeStrategy.slice(1)} Strategy Settings
-              </h3>
+      <ErrorBoundary>
+        <div className="card bg-base-100 border border-base-300 shadow-md">
+          <div className="card-body">
+            <h2 className="text-xl font-semibold mb-4">Bot Configurations</h2>
+            {botConfigsLoading ? (
+              <div className="loading loading-spinner text-primary" />
+            ) : !botConfigs || botConfigs.length === 0 ? (
+              <p className="text-sm text-gray-500">No configurations found.</p>
+            ) : (
               <table className="table table-sm w-full">
                 <thead className="bg-base-200">
                   <tr>
@@ -508,26 +373,195 @@ function BotConfigPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {activeKeys.map((row, i) => (
+                  {botConfigs.map((row, i) => (
                     <tr key={i}>
-                      <td className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {displayLabel(row.key)}
-                          <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
-                            <Info className="w-4 h-4 text-blue-400" />
-                          </div>
-                        </div>
-                      </td>
-                      <td>{renderEditableRow(row)}</td>
-                      <td className="text-sm text-gray-500">{getTooltip(row.key)}</td>
+                      <td className="font-medium">{row.key}</td>
+                      <td>{renderEditableRow(row, true)}</td>
+                      <td className="text-sm text-gray-500">{row.description}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </ErrorBoundary>
+
+      {/* Whale Wallets Section */}
+      <ErrorBoundary>
+        <div className="card bg-base-100 border border-base-300 shadow-md">
+          <div className="card-body">
+            <h2 className="text-xl font-semibold mb-4">Whale Wallets</h2>
+            {whaleWalletsLoading ? (
+              <div className="loading loading-spinner text-primary" />
+            ) : !whaleWallets || whaleWallets.length === 0 ? (
+              <p className="text-sm text-gray-500">No whale wallets found.</p>
+            ) : (
+              <>
+                <table className="table table-sm w-full">
+                  <thead className="bg-base-200">
+                    <tr>
+                      <th>Address</th>
+                      <th>Description</th>
+                      <th>Active</th>
+                      <th>Added At</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {whaleWallets.map((row, i) => {
+                      const [localAddress, setLocalAddress] = useState(row.address);
+                      const [localDescription, setLocalDescription] = useState(row.description);
+                      const [localActive, setLocalActive] = useState(row.active);
+                      const save = (field: 'address' | 'description' | 'active') => {
+                        updateWhale.mutate({
+                          address: field === 'address' ? localAddress : row.address,
+                          description: field === 'description' ? localDescription : row.description,
+                          active: field === 'active' ? localActive : row.active,
+                        });
+                      };
+                      return (
+                        <tr key={i}>
+                          <td>
+                            <input
+                              className="input input-sm input-bordered w-full"
+                              value={localAddress}
+                              onChange={(e) => setLocalAddress(e.target.value)}
+                              onBlur={() => save('address')}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="input input-sm input-bordered w-full"
+                              value={localDescription}
+                              onChange={(e) => setLocalDescription(e.target.value)}
+                              onBlur={() => save('description')}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-sm"
+                              checked={localActive}
+                              onChange={(e) => {
+                                setLocalActive(e.target.checked);
+                                save('active');
+                              }}
+                            />
+                          </td>
+                          <td>{new Date(row.added_at).toLocaleString()}</td>
+                          <td>
+                            <button
+                              className="btn btn-xs btn-error"
+                              onClick={() => deleteWhale.mutate(row.address)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div className="mt-4 flex gap-4 items-end">
+                  <div className="form-control flex-1">
+                    <label className="label text-sm">New Wallet Address</label>
+                    <input
+                      className="input input-sm input-bordered w-full"
+                      value={newWhaleAddress}
+                      onChange={(e) => setNewWhaleAddress(e.target.value)}
+                      placeholder="Enter wallet address"
+                    />
+                  </div>
+                  <div className="form-control flex-1">
+                    <label className="label text-sm">Description</label>
+                    <input
+                      className="input input-sm input-bordered w-full"
+                      value={newWhaleDescription}
+                      onChange={(e) => setNewWhaleDescription(e.target.value)}
+                      placeholder="Optional description"
+                    />
+                  </div>
+                  <button className="btn btn-xs btn-outline" onClick={handleAddWhale}>
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    Add Wallet
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </ErrorBoundary>
+
+      {/* Trading Strategies Section */}
+      <ErrorBoundary>
+        <div className="card bg-base-100 border border-base-300 shadow-md">
+          <div className="card-body">
+            <h2 className="text-xl font-semibold mb-4">Trading Strategies</h2>
+            {strategyConfigsLoading ? (
+              <div className="loading loading-spinner text-primary" />
+            ) : !strategyConfigs || strategyConfigs.length === 0 ? (
+              <p className="text-sm text-gray-500">No strategy configurations found.</p>
+            ) : (
+              <>
+                <div className="form-control mb-4">
+                  <label className="label font-medium">Active Strategy</label>
+                  <div className="flex gap-3">
+                    {['trailing', 'simple'].map((type) => (
+                      <label key={type} className="label cursor-pointer flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="strategy"
+                          className="radio radio-primary"
+                          checked={activeStrategy === type}
+                          onChange={() => {
+                            setActiveStrategy(type);
+                            updateStrategyConfig.mutate({ key: 'active_strategy', value: type });
+                          }}
+                        />
+                        <span className="label-text capitalize">{type}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {activeStrategy === 'trailing'
+                      ? 'Advanced strategy with trailing stop loss, take profits, and capital recovery.'
+                      : 'Simple strategy with fixed stop loss and take profit levels.'}
+                  </p>
+                </div>
+                <h3 className="text-lg font-medium mb-2">
+                  {activeStrategy.charAt(0).toUpperCase() + activeStrategy.slice(1)} Strategy Settings
+                </h3>
+                <table className="table table-sm w-full">
+                  <thead className="bg-base-200">
+                    <tr>
+                      <th>Setting</th>
+                      <th>Value</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeKeys.map((row, i) => (
+                      <tr key={i}>
+                        <td className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {displayLabel(row.key)}
+                            <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
+                              <Info className="w-4 h-4 text-blue-400" />
+                            </div>
+                          </div>
+                        </td>
+                        <td>{renderEditableRow(row)}</td>
+                        <td className="text-sm text-gray-500">{getTooltip(row.key)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+          </div>
+        </div>
+      </ErrorBoundary>
     </div>
   );
 }
