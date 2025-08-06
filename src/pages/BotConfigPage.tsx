@@ -57,23 +57,25 @@ function getTooltip(key: string): string {
   };
   return tips[key] || '';
 }
+
 function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
 
-  const { data: strategyConfigs = [] } = useQuery<StrategyRow[]>({
+  const { data: strategyConfigsRaw } = useQuery<StrategyRow[]>({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
       const { data, error } = await supabase.from('strategy_config').select('*');
       if (error) throw error;
       return data as StrategyRow[];
     },
-    // @ts-ignore
     onSuccess: (data: StrategyRow[]) => {
-      const active = data.find((d: StrategyRow) => d.key === 'active_strategy')?.value || 'trailing';
+      const active = data.find((d) => d.key === 'active_strategy')?.value || 'trailing';
       setActiveStrategy(active);
     },
   });
+
+  const strategyConfigs: StrategyRow[] = strategyConfigsRaw ?? [];
 
   const updateStrategyConfig = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
@@ -83,14 +85,13 @@ function BotConfigPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['strategy_configs'] }),
   });
 
-  const trailingKeys = (strategyConfigs || []).filter(
+  const trailingKeys = strategyConfigs.filter(
     (cfg: StrategyRow) => cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
   );
 
-  const simpleKeys = (strategyConfigs || []).filter(
+  const simpleKeys = strategyConfigs.filter(
     (cfg: StrategyRow) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
   );
-
   const renderEditableRow = (row: StrategyRow) => {
     const key = row.key;
     const rawValue = row.value;
@@ -136,7 +137,9 @@ function BotConfigPage() {
             className="btn btn-xs btn-outline"
             onClick={() => {
               const field = key.includes('step') ? 'ratio' : 'multiple';
-              setLocalValue(JSON.stringify([...parsed, { [field]: 2, percent: 10 }]));
+              setLocalValue(
+                JSON.stringify([...parsed, { [field]: 2, percent: 10 }])
+              );
               setDirty(true);
             }}
           >
@@ -174,6 +177,7 @@ function BotConfigPage() {
       </div>
     );
   };
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       <div className="flex items-center gap-3">
@@ -209,7 +213,7 @@ function BotConfigPage() {
               </tr>
             </thead>
             <tbody>
-              {(activeStrategy === 'trailing' ? trailingKeys : simpleKeys).map((row, i) => (
+              {(activeStrategy === 'trailing' ? trailingKeys : simpleKeys).map((row: StrategyRow, i: number) => (
                 <tr key={i}>
                   <td className="flex items-center gap-2 font-medium">
                     {displayLabel(row.key)}
@@ -224,7 +228,6 @@ function BotConfigPage() {
           </table>
         </div>
       </div>
-
       {/* Global Settings */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
@@ -237,7 +240,7 @@ function BotConfigPage() {
               </tr>
             </thead>
             <tbody>
-              {(strategyConfigs || [])
+              {strategyConfigs
                 .filter(
                   (cfg: StrategyRow) =>
                     !cfg.key.startsWith('trailing_') &&
@@ -245,7 +248,7 @@ function BotConfigPage() {
                     !cfg.key.startsWith('whale_wallet_') &&
                     cfg.key !== 'active_strategy'
                 )
-                .map((row, i) => (
+                .map((row: StrategyRow, i: number) => (
                   <tr key={i}>
                     <td>{row.key}</td>
                     <td>{renderEditableRow(row)}</td>
@@ -269,9 +272,9 @@ function BotConfigPage() {
               </tr>
             </thead>
             <tbody>
-              {(strategyConfigs || [])
+              {strategyConfigs
                 .filter((cfg: StrategyRow) => cfg.key.startsWith('whale_wallet_'))
-                .map((row, i) => {
+                .map((row: StrategyRow, i: number) => {
                   const [local, setLocal] = useState(row.value);
                   const save = () =>
                     updateStrategyConfig.mutate({ key: row.key, value: local });
