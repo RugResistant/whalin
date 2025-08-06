@@ -1,4 +1,3 @@
-// src/pages/BotConfigPage.tsx
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import {
@@ -8,13 +7,11 @@ import {
 } from '@tanstack/react-query';
 import {
   Settings,
-  Wallet,
   Save,
-  Trash2,
   PlusCircle,
-  Coins,
   Info,
 } from 'lucide-react';
+import { WhaleWalletRow } from '../components/WhaleWalletRow';
 
 interface StrategyConfigRow {
   key: string;
@@ -58,26 +55,24 @@ function getTooltip(key: string): string {
   };
   return tips[key] || '';
 }
+
 function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
 
-  const {
-    data: strategyConfigs = [],
-  } = useQuery<StrategyConfigRow[]>({
+  const { data: strategyConfigs = [] } = useQuery<StrategyConfigRow[]>({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
       const { data, error } = await supabase.from('strategy_config').select('*');
       if (error) throw error;
       return data as StrategyConfigRow[];
     },
-    staleTime: 1000 * 60,
-    gcTime: 1000 * 60 * 5,
-  });
-
-  useState(() => {
-    const active = strategyConfigs.find((d) => d.key === 'active_strategy')?.value || 'trailing';
-    setActiveStrategy(active);
+    staleTime: 10000,
+    refetchInterval: 30000,
+    onSuccess: (data) => {
+      const active = data.find((d) => d.key === 'active_strategy')?.value || 'trailing';
+      setActiveStrategy(active);
+    },
   });
 
   const updateStrategyConfig = useMutation({
@@ -88,8 +83,13 @@ function BotConfigPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['strategy_configs'] }),
   });
 
-  const filteredRows = (prefix: string) =>
-    strategyConfigs.filter((cfg) => cfg.key.startsWith(prefix) && activeStrategy === prefix.split('_')[0]);
+  const trailingKeys = strategyConfigs.filter((cfg) =>
+    cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
+  );
+
+  const simpleKeys = strategyConfigs.filter((cfg) =>
+    cfg.key.startsWith('simple_') && activeStrategy === 'simple'
+  );
 
   const renderEditableRow = (row: StrategyConfigRow) => {
     const key = row.key;
@@ -111,7 +111,7 @@ function BotConfigPage() {
               <input
                 type="number"
                 className="input input-sm input-bordered w-24"
-                value={tp.multiple ?? tp.ratio ?? 1}
+                value={tp.multiple ?? tp.ratio ?? ''}
                 onChange={(e) => {
                   const updated = [...parsed];
                   if (tp.multiple !== undefined) updated[idx].multiple = parseFloat(e.target.value);
@@ -125,9 +125,8 @@ function BotConfigPage() {
                 className="input input-sm input-bordered w-24"
                 value={tp.percent}
                 onChange={(e) => {
-                  const updated = [...parsed];
-                  updated[idx].percent = parseFloat(e.target.value);
-                  setLocalValue(JSON.stringify(updated));
+                  parsed[idx].percent = parseFloat(e.target.value);
+                  setLocalValue(JSON.stringify(parsed));
                   setDirty(true);
                 }}
               />
@@ -137,18 +136,19 @@ function BotConfigPage() {
             className="btn btn-xs btn-outline"
             onClick={() => {
               const field = key.includes('step') ? 'ratio' : 'multiple';
-              setLocalValue(
-                JSON.stringify([...parsed, { [field]: 2, percent: 10 }])
-              );
+              setLocalValue(JSON.stringify([...parsed, { [field]: 2, percent: 10 }]));
               setDirty(true);
             }}
           >
             + Add
           </button>
           {dirty && (
-            <button className="btn btn-xs btn-primary mt-1" onClick={save}>
-              <Save className="w-4 h-4 mr-1" /> Save
-            </button>
+            <div className="mt-1 flex items-center gap-2">
+              <Save className="w-4 h-4 text-green-500" />
+              <button className="btn btn-xs btn-primary" onClick={save}>
+                Save
+              </button>
+            </div>
           )}
         </div>
       );
@@ -175,33 +175,6 @@ function BotConfigPage() {
       </div>
     );
   };
-
-  const renderTable = (rows: StrategyConfigRow[]) => (
-    <div className="overflow-x-auto">
-      <table className="table table-sm w-full">
-        <thead className="bg-base-200">
-          <tr>
-            <th>Setting</th>
-            <th>Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i}>
-              <td className="flex items-center gap-2 font-medium">
-                {displayLabel(row.key)}
-                <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
-                  <Info className="w-4 h-4 text-blue-400" />
-                </div>
-              </td>
-              <td>{renderEditableRow(row)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       <div className="flex items-center gap-3">
@@ -211,17 +184,22 @@ function BotConfigPage() {
 
       <div className="flex gap-3 items-center">
         <span className="font-medium">Active Strategy:</span>
-        {['trailing', 'simple'].map((type) => (
-          <button
-            key={type}
-            className={`btn btn-sm ${activeStrategy === type ? 'btn-primary' : 'btn-outline'}`}
-            onClick={() =>
-              updateStrategyConfig.mutate({ key: 'active_strategy', value: type })
-            }
-          >
-            {type[0].toUpperCase() + type.slice(1)}
-          </button>
-        ))}
+        <button
+          className={`btn btn-sm ${activeStrategy === 'trailing' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() =>
+            updateStrategyConfig.mutate({ key: 'active_strategy', value: 'trailing' })
+          }
+        >
+          Trailing
+        </button>
+        <button
+          className={`btn btn-sm ${activeStrategy === 'simple' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() =>
+            updateStrategyConfig.mutate({ key: 'active_strategy', value: 'simple' })
+          }
+        >
+          Simple
+        </button>
       </div>
 
       <div className="card bg-base-100 border border-base-300 shadow-md">
@@ -229,91 +207,89 @@ function BotConfigPage() {
           <h2 className="text-xl font-semibold mb-4">
             {activeStrategy === 'trailing' ? 'Trailing Strategy Settings' : 'Simple Strategy Settings'}
           </h2>
-          {renderTable(filteredRows(`${activeStrategy}_`))}
+          <div className="overflow-x-auto">
+            <table className="table table-sm w-full">
+              <thead className="bg-base-200">
+                <tr>
+                  <th>Setting</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(activeStrategy === 'trailing' ? trailingKeys : simpleKeys).map((row, i) => (
+                  <tr key={i}>
+                    <td className="flex items-center gap-2 font-medium">
+                      {displayLabel(row.key)}
+                      <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
+                        <Info className="w-4 h-4 text-blue-400" />
+                      </div>
+                    </td>
+                    <td>{renderEditableRow(row)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">Global Settings</h2>
-          {renderTable(
-            strategyConfigs.filter(
-              (cfg) =>
-                !cfg.key.startsWith('trailing_') &&
-                !cfg.key.startsWith('simple_') &&
-                cfg.key !== 'active_strategy' &&
-                !cfg.key.startsWith('whale_wallet_')
-            )
-          )}
-        </div>
-      </div>
-
-      <div className="card bg-base-100 border border-base-300 shadow-md">
-        <div className="card-body">
-          <h2 className="text-xl font-semibold mb-4">Whale Wallets</h2>
           <div className="overflow-x-auto">
             <table className="table table-sm w-full">
               <thead className="bg-base-200">
                 <tr>
-                  <th>Index</th>
-                  <th>Wallet</th>
-                  <th>Actions</th>
+                  <th>Setting</th>
+                  <th>Value</th>
                 </tr>
               </thead>
               <tbody>
                 {strategyConfigs
-                  .filter((cfg) => cfg.key.startsWith('whale_wallet_'))
-                  .map((row, i) => {
-                    const [local, setLocal] = useState(row.value);
-                    return (
-                      <tr key={i}>
-                        <td>{row.key.replace('whale_wallet_', '')}</td>
-                        <td>
-                          <input
-                            className="input input-sm input-bordered w-full"
-                            value={local}
-                            onChange={(e) => setLocal(e.target.value)}
-                            onBlur={() =>
-                              updateStrategyConfig.mutate({ key: row.key, value: local })
-                            }
-                          />
-                        </td>
-                        <td>
-                          <button
-                            className="btn btn-xs btn-error"
-                            onClick={() =>
-                              supabase
-                                .from('strategy_config')
-                                .delete()
-                                .eq('key', row.key)
-                                .then(() =>
-                                  queryClient.invalidateQueries({
-                                    queryKey: ['strategy_configs'],
-                                  })
-                                )
-                            }
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  .filter((cfg) =>
+                    !cfg.key.startsWith('trailing_') &&
+                    !cfg.key.startsWith('simple_') &&
+                    cfg.key !== 'active_strategy' &&
+                    !cfg.key.startsWith('whale_wallet_')
+                  )
+                  .map((row, i) => (
+                    <tr key={i}>
+                      <td className="font-medium">{row.key}</td>
+                      <td>{renderEditableRow(row)}</td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
-            <button
-              className="btn btn-sm btn-outline mt-3"
-              onClick={() =>
-                updateStrategyConfig.mutate({
-                  key: `whale_wallet_${Date.now()}`,
-                  value: '',
-                })
-              }
-            >
-              <PlusCircle className="w-4 h-4 mr-2" />
-              Add Wallet
-            </button>
           </div>
+        </div>
+      </div>
+
+      {/* Whale Wallets Section */}
+      <div className="card bg-base-100 border border-base-300 shadow-md">
+        <div className="card-body">
+          <h2 className="text-xl font-semibold mb-4">Whale Wallets</h2>
+          {strategyConfigs
+            .filter((cfg) => cfg.key.startsWith('whale_wallet_'))
+            .map((row) => (
+              <WhaleWalletRow
+                key={row.key}
+                row={row}
+                updateStrategyConfig={updateStrategyConfig}
+                queryClient={queryClient}
+              />
+            ))}
+          <button
+            className="btn btn-sm btn-outline mt-3"
+            onClick={() =>
+              updateStrategyConfig.mutate({
+                key: `whale_wallet_${Date.now()}`,
+                value: '',
+              })
+            }
+          >
+            <PlusCircle className="w-4 h-4 mr-2" />
+            Add Wallet
+          </button>
         </div>
       </div>
     </div>
