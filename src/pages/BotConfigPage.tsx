@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   useQuery,
@@ -8,15 +8,10 @@ import {
 import {
   Settings,
   Save,
+  Trash2,
   PlusCircle,
   Info,
 } from 'lucide-react';
-import { WhaleWalletRow } from '../components/WhaleWalletRow';
-
-interface StrategyConfigRow {
-  key: string;
-  value: string;
-}
 
 function parseTakeProfit(value: string): { multiple?: number; ratio?: number; percent: number }[] {
   try {
@@ -33,6 +28,7 @@ function displayLabel(key: string): string {
     trailing_take_profit_levels: 'Take Profit Levels',
     trailing_activation_ratio: 'Trailing Activation (x)',
     trailing_cushion: 'Trailing Cushion %',
+
     simple_stop_loss_ratio: 'Stop Loss %',
     simple_take_profit_ratio: 'Take Profit (x)',
     simple_partial_sell_percent_at_take_profit: 'Partial Sell % at TP',
@@ -48,6 +44,7 @@ function getTooltip(key: string): string {
     trailing_take_profit_levels: 'E.g. [{ "multiple": 3, "percent": 30 }]',
     trailing_activation_ratio: 'Trailing stop activates after this x-multiple.',
     trailing_cushion: 'How much price must drop from peak to trigger sell.',
+
     simple_stop_loss_ratio: 'Sell if price drops below this % of buy.',
     simple_take_profit_ratio: 'Sell % of tokens at this multiple.',
     simple_partial_sell_percent_at_take_profit: 'What % to sell at TP ratio.',
@@ -55,23 +52,25 @@ function getTooltip(key: string): string {
   };
   return tips[key] || '';
 }
-
 function BotConfigPage() {
   const queryClient = useQueryClient();
-  const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
+  const [activeStrategy, setActiveStrategy] = useState('trailing');
+  const [walletsState, setWalletsState] = useState<Record<string, string>>({});
 
-  const { data: strategyConfigs = [] } = useQuery<StrategyConfigRow[]>({
+  const { data: strategyConfigs = [] } = useQuery({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
       const { data, error } = await supabase.from('strategy_config').select('*');
       if (error) throw error;
-      return data as StrategyConfigRow[];
+      return data;
     },
-    staleTime: 10000,
-    refetchInterval: 30000,
     onSuccess: (data) => {
       const active = data.find((d) => d.key === 'active_strategy')?.value || 'trailing';
       setActiveStrategy(active);
+      const wallets = data
+        .filter((d) => d.key.startsWith('whale_wallet_'))
+        .reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
+      setWalletsState(wallets);
     },
   });
 
@@ -83,15 +82,15 @@ function BotConfigPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['strategy_configs'] }),
   });
 
-  const trailingKeys = strategyConfigs.filter((cfg) =>
-    cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
+  const trailingKeys = strategyConfigs.filter(
+    (cfg) => cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
   );
 
-  const simpleKeys = strategyConfigs.filter((cfg) =>
-    cfg.key.startsWith('simple_') && activeStrategy === 'simple'
+  const simpleKeys = strategyConfigs.filter(
+    (cfg) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
   );
 
-  const renderEditableRow = (row: StrategyConfigRow) => {
+  const renderEditableRow = (row: any) => {
     const key = row.key;
     const rawValue = row.value;
     const [localValue, setLocalValue] = useState(rawValue);
@@ -103,7 +102,7 @@ function BotConfigPage() {
     };
 
     if (key.includes('take_profit_levels') || key.includes('take_profit_steps')) {
-      const parsed = parseTakeProfit(localValue);
+      const parsed = parseTakeProfit(rawValue);
       return (
         <div className="flex flex-col gap-2">
           {parsed.map((tp, idx) => (
@@ -114,8 +113,8 @@ function BotConfigPage() {
                 value={tp.multiple ?? tp.ratio ?? ''}
                 onChange={(e) => {
                   const updated = [...parsed];
-                  if (tp.multiple !== undefined) updated[idx].multiple = parseFloat(e.target.value);
-                  if (tp.ratio !== undefined) updated[idx].ratio = parseFloat(e.target.value);
+                  if ('multiple' in tp) updated[idx].multiple = parseFloat(e.target.value);
+                  if ('ratio' in tp) updated[idx].ratio = parseFloat(e.target.value);
                   setLocalValue(JSON.stringify(updated));
                   setDirty(true);
                 }}
@@ -202,90 +201,118 @@ function BotConfigPage() {
         </button>
       </div>
 
+      {/* Strategy Settings */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">
-            {activeStrategy === 'trailing' ? 'Trailing Strategy Settings' : 'Simple Strategy Settings'}
+            {activeStrategy === 'trailing'
+              ? 'Trailing Strategy Settings'
+              : 'Simple Strategy Settings'}
           </h2>
-          <div className="overflow-x-auto">
-            <table className="table table-sm w-full">
-              <thead className="bg-base-200">
-                <tr>
-                  <th>Setting</th>
-                  <th>Value</th>
+          <table className="table table-sm w-full">
+            <thead className="bg-base-200">
+              <tr>
+                <th>Setting</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(activeStrategy === 'trailing' ? trailingKeys : simpleKeys).map((row, i) => (
+                <tr key={i}>
+                  <td className="flex items-center gap-2 font-medium">
+                    {displayLabel(row.key)}
+                    <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
+                      <Info className="w-4 h-4 text-blue-400" />
+                    </div>
+                  </td>
+                  <td>{renderEditableRow(row)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {(activeStrategy === 'trailing' ? trailingKeys : simpleKeys).map((row, i) => (
-                  <tr key={i}>
-                    <td className="flex items-center gap-2 font-medium">
-                      {displayLabel(row.key)}
-                      <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
-                        <Info className="w-4 h-4 text-blue-400" />
-                      </div>
-                    </td>
-                    <td>{renderEditableRow(row)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
+      {/* Global Configs */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">Global Settings</h2>
-          <div className="overflow-x-auto">
-            <table className="table table-sm w-full">
-              <thead className="bg-base-200">
-                <tr>
-                  <th>Setting</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {strategyConfigs
-                  .filter((cfg) =>
+          <table className="table table-sm w-full">
+            <thead className="bg-base-200">
+              <tr>
+                <th>Setting</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {strategyConfigs
+                .filter(
+                  (cfg) =>
                     !cfg.key.startsWith('trailing_') &&
                     !cfg.key.startsWith('simple_') &&
                     cfg.key !== 'active_strategy' &&
                     !cfg.key.startsWith('whale_wallet_')
-                  )
-                  .map((row, i) => (
-                    <tr key={i}>
-                      <td className="font-medium">{row.key}</td>
-                      <td>{renderEditableRow(row)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+                )
+                .map((row, i) => (
+                  <tr key={i}>
+                    <td className="font-medium">{row.key}</td>
+                    <td>{renderEditableRow(row)}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Whale Wallets Section */}
+      {/* Whale Wallets */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">Whale Wallets</h2>
-          {strategyConfigs
-            .filter((cfg) => cfg.key.startsWith('whale_wallet_'))
-            .map((row) => (
-              <WhaleWalletRow
-                key={row.key}
-                row={row}
-                updateStrategyConfig={updateStrategyConfig}
-                queryClient={queryClient}
-              />
-            ))}
+          <table className="table table-sm w-full">
+            <thead className="bg-base-200">
+              <tr>
+                <th>Index</th>
+                <th>Wallet Address</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(walletsState).map(([key, value], i) => (
+                <tr key={i}>
+                  <td>{key.replace('whale_wallet_', '')}</td>
+                  <td>
+                    <input
+                      className="input input-sm input-bordered w-full"
+                      value={value}
+                      onChange={(e) =>
+                        setWalletsState({ ...walletsState, [key]: e.target.value })
+                      }
+                      onBlur={() =>
+                        updateStrategyConfig.mutate({ key, value: walletsState[key] })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-xs btn-error"
+                      onClick={async () => {
+                        await supabase.from('strategy_config').delete().eq('key', key);
+                        queryClient.invalidateQueries({ queryKey: ['strategy_configs'] });
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           <button
             className="btn btn-sm btn-outline mt-3"
-            onClick={() =>
-              updateStrategyConfig.mutate({
-                key: `whale_wallet_${Date.now()}`,
-                value: '',
-              })
-            }
+            onClick={() => {
+              const newKey = `whale_wallet_${Date.now()}`;
+              updateStrategyConfig.mutate({ key: newKey, value: '' });
+            }}
           >
             <PlusCircle className="w-4 h-4 mr-2" />
             Add Wallet
