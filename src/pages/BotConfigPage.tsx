@@ -4,6 +4,7 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
+  UseQueryResult,
 } from '@tanstack/react-query';
 import {
   Settings,
@@ -12,6 +13,11 @@ import {
   PlusCircle,
   Info,
 } from 'lucide-react';
+
+type StrategyRow = {
+  key: string;
+  value: string;
+};
 
 function parseTakeProfit(value: string): { multiple?: number; ratio?: number; percent: number }[] {
   try {
@@ -54,23 +60,19 @@ function getTooltip(key: string): string {
 }
 function BotConfigPage() {
   const queryClient = useQueryClient();
-  const [activeStrategy, setActiveStrategy] = useState('trailing');
-  const [walletsState, setWalletsState] = useState<Record<string, string>>({});
+  const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
 
-  const { data: strategyConfigs = [] } = useQuery({
+  const { data: strategyConfigs = [] } = useQuery<StrategyRow[]>({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
       const { data, error } = await supabase.from('strategy_config').select('*');
       if (error) throw error;
-      return data;
+      return data as StrategyRow[];
     },
-    onSuccess: (data) => {
+    // @ts-ignore: onSuccess is valid for this overload
+    onSuccess: (data: StrategyRow[]) => {
       const active = data.find((d) => d.key === 'active_strategy')?.value || 'trailing';
       setActiveStrategy(active);
-      const wallets = data
-        .filter((d) => d.key.startsWith('whale_wallet_'))
-        .reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
-      setWalletsState(wallets);
     },
   });
 
@@ -89,8 +91,7 @@ function BotConfigPage() {
   const simpleKeys = strategyConfigs.filter(
     (cfg) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
   );
-
-  const renderEditableRow = (row: any) => {
+  const renderEditableRow = (row: StrategyRow) => {
     const key = row.key;
     const rawValue = row.value;
     const [localValue, setLocalValue] = useState(rawValue);
@@ -102,7 +103,7 @@ function BotConfigPage() {
     };
 
     if (key.includes('take_profit_levels') || key.includes('take_profit_steps')) {
-      const parsed = parseTakeProfit(rawValue);
+      const parsed = parseTakeProfit(localValue);
       return (
         <div className="flex flex-col gap-2">
           {parsed.map((tp, idx) => (
@@ -110,11 +111,11 @@ function BotConfigPage() {
               <input
                 type="number"
                 className="input input-sm input-bordered w-24"
-                value={tp.multiple ?? tp.ratio ?? ''}
+                value={tp.multiple ?? tp.ratio}
                 onChange={(e) => {
                   const updated = [...parsed];
-                  if ('multiple' in tp) updated[idx].multiple = parseFloat(e.target.value);
-                  if ('ratio' in tp) updated[idx].ratio = parseFloat(e.target.value);
+                  if (tp.multiple !== undefined) updated[idx].multiple = parseFloat(e.target.value);
+                  if (tp.ratio !== undefined) updated[idx].ratio = parseFloat(e.target.value);
                   setLocalValue(JSON.stringify(updated));
                   setDirty(true);
                 }}
@@ -135,7 +136,9 @@ function BotConfigPage() {
             className="btn btn-xs btn-outline"
             onClick={() => {
               const field = key.includes('step') ? 'ratio' : 'multiple';
-              setLocalValue(JSON.stringify([...parsed, { [field]: 2, percent: 10 }]));
+              setLocalValue(
+                JSON.stringify([...parsed, { [field]: 2, percent: 10 }])
+              );
               setDirty(true);
             }}
           >
@@ -156,9 +159,8 @@ function BotConfigPage() {
     return (
       <div className="flex items-center gap-2">
         <input
-          type="number"
-          step="any"
-          className="input input-sm input-bordered w-32"
+          type="text"
+          className="input input-sm input-bordered w-48"
           value={localValue}
           onChange={(e) => {
             setLocalValue(e.target.value);
@@ -174,6 +176,7 @@ function BotConfigPage() {
       </div>
     );
   };
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       <div className="flex items-center gap-3">
@@ -183,31 +186,23 @@ function BotConfigPage() {
 
       <div className="flex gap-3 items-center">
         <span className="font-medium">Active Strategy:</span>
-        <button
-          className={`btn btn-sm ${activeStrategy === 'trailing' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() =>
-            updateStrategyConfig.mutate({ key: 'active_strategy', value: 'trailing' })
-          }
-        >
-          Trailing
-        </button>
-        <button
-          className={`btn btn-sm ${activeStrategy === 'simple' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() =>
-            updateStrategyConfig.mutate({ key: 'active_strategy', value: 'simple' })
-          }
-        >
-          Simple
-        </button>
+        {['trailing', 'simple'].map((type) => (
+          <button
+            key={type}
+            className={`btn btn-sm ${
+              activeStrategy === type ? 'btn-primary' : 'btn-outline'
+            }`}
+            onClick={() => updateStrategyConfig.mutate({ key: 'active_strategy', value: type })}
+          >
+            {type.charAt(0).toUpperCase() + type.slice(1)}
+          </button>
+        ))}
       </div>
 
-      {/* Strategy Settings */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">
-            {activeStrategy === 'trailing'
-              ? 'Trailing Strategy Settings'
-              : 'Simple Strategy Settings'}
+            {activeStrategy === 'trailing' ? 'Trailing Strategy Settings' : 'Simple Strategy Settings'}
           </h2>
           <table className="table table-sm w-full">
             <thead className="bg-base-200">
@@ -233,14 +228,14 @@ function BotConfigPage() {
         </div>
       </div>
 
-      {/* Global Configs */}
+      {/* Global Settings */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">Global Settings</h2>
           <table className="table table-sm w-full">
             <thead className="bg-base-200">
               <tr>
-                <th>Setting</th>
+                <th>Key</th>
                 <th>Value</th>
               </tr>
             </thead>
@@ -250,12 +245,12 @@ function BotConfigPage() {
                   (cfg) =>
                     !cfg.key.startsWith('trailing_') &&
                     !cfg.key.startsWith('simple_') &&
-                    cfg.key !== 'active_strategy' &&
-                    !cfg.key.startsWith('whale_wallet_')
+                    !cfg.key.startsWith('whale_wallet_') &&
+                    cfg.key !== 'active_strategy'
                 )
                 .map((row, i) => (
                   <tr key={i}>
-                    <td className="font-medium">{row.key}</td>
+                    <td>{row.key}</td>
                     <td>{renderEditableRow(row)}</td>
                   </tr>
                 ))}
@@ -264,7 +259,7 @@ function BotConfigPage() {
         </div>
       </div>
 
-      {/* Whale Wallets */}
+      {/* Whale Wallets Inline */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">Whale Wallets</h2>
@@ -277,42 +272,53 @@ function BotConfigPage() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(walletsState).map(([key, value], i) => (
-                <tr key={i}>
-                  <td>{key.replace('whale_wallet_', '')}</td>
-                  <td>
-                    <input
-                      className="input input-sm input-bordered w-full"
-                      value={value}
-                      onChange={(e) =>
-                        setWalletsState({ ...walletsState, [key]: e.target.value })
-                      }
-                      onBlur={() =>
-                        updateStrategyConfig.mutate({ key, value: walletsState[key] })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <button
-                      className="btn btn-xs btn-error"
-                      onClick={async () => {
-                        await supabase.from('strategy_config').delete().eq('key', key);
-                        queryClient.invalidateQueries({ queryKey: ['strategy_configs'] });
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {strategyConfigs
+                .filter((cfg) => cfg.key.startsWith('whale_wallet_'))
+                .map((row, i) => {
+                  const [local, setLocal] = useState(row.value);
+                  const save = () =>
+                    updateStrategyConfig.mutate({ key: row.key, value: local });
+
+                  return (
+                    <tr key={i}>
+                      <td>{row.key.replace('whale_wallet_', '')}</td>
+                      <td>
+                        <input
+                          className="input input-sm input-bordered w-full"
+                          value={local}
+                          onChange={(e) => setLocal(e.target.value)}
+                          onBlur={save}
+                        />
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-xs btn-error"
+                          onClick={() =>
+                            supabase
+                              .from('strategy_config')
+                              .delete()
+                              .eq('key', row.key)
+                              .then(() =>
+                                queryClient.invalidateQueries({ queryKey: ['strategy_configs'] })
+                              )
+                          }
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
           <button
             className="btn btn-sm btn-outline mt-3"
-            onClick={() => {
-              const newKey = `whale_wallet_${Date.now()}`;
-              updateStrategyConfig.mutate({ key: newKey, value: '' });
-            }}
+            onClick={() =>
+              updateStrategyConfig.mutate({
+                key: `whale_wallet_${Date.now()}`,
+                value: '',
+              })
+            }
           >
             <PlusCircle className="w-4 h-4 mr-2" />
             Add Wallet
