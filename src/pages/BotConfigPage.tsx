@@ -4,7 +4,6 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
-  UseQueryResult,
 } from '@tanstack/react-query';
 import {
   Settings,
@@ -34,7 +33,6 @@ function displayLabel(key: string): string {
     trailing_take_profit_levels: 'Take Profit Levels',
     trailing_activation_ratio: 'Trailing Activation (x)',
     trailing_cushion: 'Trailing Cushion %',
-
     simple_stop_loss_ratio: 'Stop Loss %',
     simple_take_profit_ratio: 'Take Profit (x)',
     simple_partial_sell_percent_at_take_profit: 'Partial Sell % at TP',
@@ -50,7 +48,6 @@ function getTooltip(key: string): string {
     trailing_take_profit_levels: 'E.g. [{ "multiple": 3, "percent": 30 }]',
     trailing_activation_ratio: 'Trailing stop activates after this x-multiple.',
     trailing_cushion: 'How much price must drop from peak to trigger sell.',
-
     simple_stop_loss_ratio: 'Sell if price drops below this % of buy.',
     simple_take_profit_ratio: 'Sell % of tokens at this multiple.',
     simple_partial_sell_percent_at_take_profit: 'What % to sell at TP ratio.',
@@ -58,10 +55,10 @@ function getTooltip(key: string): string {
   };
   return tips[key] || '';
 }
+
 function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
-
   const { data: strategyConfigs = [] } = useQuery<StrategyRow[]>({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
@@ -69,12 +66,12 @@ function BotConfigPage() {
       if (error) throw error;
       return data as StrategyRow[];
     },
-    // @ts-ignore: onSuccess is valid for this overload
-    onSuccess: (data: StrategyRow[]) => {
-      const active = data.find((d) => d.key === 'active_strategy')?.value || 'trailing';
-      setActiveStrategy(active);
-    },
   });
+
+  useEffect(() => {
+    const active = strategyConfigs.find((d: StrategyRow) => d.key === 'active_strategy')?.value || 'trailing';
+    setActiveStrategy(active);
+  }, [strategyConfigs]);
 
   const updateStrategyConfig = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
@@ -85,23 +82,21 @@ function BotConfigPage() {
   });
 
   const trailingKeys = strategyConfigs.filter(
-    (cfg) => cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
+    (cfg: StrategyRow) => cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
+  );
+  const simpleKeys = strategyConfigs.filter(
+    (cfg: StrategyRow) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
   );
 
-  const simpleKeys = strategyConfigs.filter(
-    (cfg) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
-  );
   const renderEditableRow = (row: StrategyRow) => {
     const key = row.key;
     const rawValue = row.value;
     const [localValue, setLocalValue] = useState(rawValue);
     const [dirty, setDirty] = useState(false);
-
     const save = () => {
       updateStrategyConfig.mutate({ key, value: localValue });
       setDirty(false);
     };
-
     if (key.includes('take_profit_levels') || key.includes('take_profit_steps')) {
       const parsed = parseTakeProfit(localValue);
       return (
@@ -155,7 +150,6 @@ function BotConfigPage() {
         </div>
       );
     }
-
     return (
       <div className="flex items-center gap-2">
         <input
@@ -176,14 +170,12 @@ function BotConfigPage() {
       </div>
     );
   };
-
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       <div className="flex items-center gap-3">
         <Settings className="w-6 h-6 text-primary" />
         <h1 className="text-3xl font-bold">Bot Sell Strategy Configuration</h1>
       </div>
-
       <div className="flex gap-3 items-center">
         <span className="font-medium">Active Strategy:</span>
         {['trailing', 'simple'].map((type) => (
@@ -198,7 +190,6 @@ function BotConfigPage() {
           </button>
         ))}
       </div>
-
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">
@@ -212,7 +203,7 @@ function BotConfigPage() {
               </tr>
             </thead>
             <tbody>
-              {(activeStrategy === 'trailing' ? trailingKeys : simpleKeys).map((row, i) => (
+              {(activeStrategy === 'trailing' ? trailingKeys : simpleKeys).map((row: StrategyRow, i: number) => (
                 <tr key={i}>
                   <td className="flex items-center gap-2 font-medium">
                     {displayLabel(row.key)}
@@ -227,7 +218,6 @@ function BotConfigPage() {
           </table>
         </div>
       </div>
-
       {/* Global Settings */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
@@ -242,13 +232,13 @@ function BotConfigPage() {
             <tbody>
               {strategyConfigs
                 .filter(
-                  (cfg) =>
+                  (cfg: StrategyRow) =>
                     !cfg.key.startsWith('trailing_') &&
                     !cfg.key.startsWith('simple_') &&
                     !cfg.key.startsWith('whale_wallet_') &&
                     cfg.key !== 'active_strategy'
                 )
-                .map((row, i) => (
+                .map((row: StrategyRow, i: number) => (
                   <tr key={i}>
                     <td>{row.key}</td>
                     <td>{renderEditableRow(row)}</td>
@@ -258,7 +248,6 @@ function BotConfigPage() {
           </table>
         </div>
       </div>
-
       {/* Whale Wallets Inline */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
@@ -273,12 +262,11 @@ function BotConfigPage() {
             </thead>
             <tbody>
               {strategyConfigs
-                .filter((cfg) => cfg.key.startsWith('whale_wallet_'))
-                .map((row, i) => {
+                .filter((cfg: StrategyRow) => cfg.key.startsWith('whale_wallet_'))
+                .map((row: StrategyRow, i: number) => {
                   const [local, setLocal] = useState(row.value);
                   const save = () =>
                     updateStrategyConfig.mutate({ key: row.key, value: local });
-
                   return (
                     <tr key={i}>
                       <td>{row.key.replace('whale_wallet_', '')}</td>
