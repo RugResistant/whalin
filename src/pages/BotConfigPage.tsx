@@ -33,7 +33,6 @@ function displayLabel(key: string): string {
     trailing_take_profit_levels: 'Take Profit Levels',
     trailing_activation_ratio: 'Trailing Activation (x)',
     trailing_cushion: 'Trailing Cushion %',
-
     simple_stop_loss_ratio: 'Stop Loss %',
     simple_take_profit_ratio: 'Take Profit (x)',
     simple_partial_sell_percent_at_take_profit: 'Partial Sell % at TP',
@@ -49,7 +48,6 @@ function getTooltip(key: string): string {
     trailing_take_profit_levels: 'E.g. [{ "multiple": 3, "percent": 30 }]',
     trailing_activation_ratio: 'Trailing stop activates after this x-multiple.',
     trailing_cushion: 'How much price must drop from peak to trigger sell.',
-
     simple_stop_loss_ratio: 'Sell if price drops below this % of buy.',
     simple_take_profit_ratio: 'Sell % of tokens at this multiple.',
     simple_partial_sell_percent_at_take_profit: 'What % to sell at TP ratio.',
@@ -69,11 +67,14 @@ function BotConfigPage() {
       if (error) throw error;
       return data as StrategyRow[];
     },
-    onSuccess: (data: StrategyRow[]) => {
-      const active = data.find((d) => d.key === 'active_strategy')?.value || 'trailing';
-      setActiveStrategy(active);
-    },
   });
+
+  useEffect(() => {
+    if (strategyConfigsRaw) {
+      const active = strategyConfigsRaw.find((d) => d.key === 'active_strategy')?.value || 'trailing';
+      setActiveStrategy(active);
+    }
+  }, [strategyConfigsRaw]);
 
   const strategyConfigs: StrategyRow[] = strategyConfigsRaw ?? [];
 
@@ -88,10 +89,10 @@ function BotConfigPage() {
   const trailingKeys = strategyConfigs.filter(
     (cfg: StrategyRow) => cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
   );
-
   const simpleKeys = strategyConfigs.filter(
     (cfg: StrategyRow) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
   );
+
   const renderEditableRow = (row: StrategyRow) => {
     const key = row.key;
     const rawValue = row.value;
@@ -184,7 +185,6 @@ function BotConfigPage() {
         <Settings className="w-6 h-6 text-primary" />
         <h1 className="text-3xl font-bold">Bot Sell Strategy Configuration</h1>
       </div>
-
       <div className="flex gap-3 items-center">
         <span className="font-medium">Active Strategy:</span>
         {['trailing', 'simple'].map((type) => (
@@ -199,7 +199,6 @@ function BotConfigPage() {
           </button>
         ))}
       </div>
-
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">
@@ -258,7 +257,6 @@ function BotConfigPage() {
           </table>
         </div>
       </div>
-
       {/* Whale Wallets Inline */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
@@ -278,7 +276,6 @@ function BotConfigPage() {
                   const [local, setLocal] = useState(row.value);
                   const save = () =>
                     updateStrategyConfig.mutate({ key: row.key, value: local });
-
                   return (
                     <tr key={i}>
                       <td>{row.key.replace('whale_wallet_', '')}</td>
