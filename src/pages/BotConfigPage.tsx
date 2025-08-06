@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   useQuery,
@@ -59,7 +59,9 @@ function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
 
-  const { data: strategyConfigs = [] } = useQuery<StrategyRow[]>({
+  const {
+    data: strategyConfigs = [],
+  } = useQuery<StrategyRow[]>({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
       const { data, error } = await supabase.from('strategy_config').select('*');
@@ -67,8 +69,8 @@ function BotConfigPage() {
       return data as StrategyRow[];
     },
     // @ts-ignore
-    onSuccess: (data) => {
-      const active = data.find((d) => d.key === 'active_strategy')?.value || 'trailing';
+    onSuccess: (data: StrategyRow[]) => {
+      const active = data.find((d: StrategyRow) => d.key === 'active_strategy')?.value || 'trailing';
       setActiveStrategy(active);
     },
   });
@@ -82,17 +84,18 @@ function BotConfigPage() {
   });
 
   const trailingKeys = strategyConfigs.filter(
-    (cfg) => cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
+    (cfg: StrategyRow) => cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
   );
+
   const simpleKeys = strategyConfigs.filter(
-    (cfg) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
+    (cfg: StrategyRow) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
   );
 
   const renderEditableRow = (row: StrategyRow) => {
     const key = row.key;
     const rawValue = row.value;
-    const [localValue, setLocalValue] = useState(rawValue);
-    const [dirty, setDirty] = useState(false);
+    const [localValue, setLocalValue] = useState<string>(rawValue);
+    const [dirty, setDirty] = useState<boolean>(false);
 
     const save = () => {
       updateStrategyConfig.mutate({ key, value: localValue });
@@ -108,11 +111,12 @@ function BotConfigPage() {
               <input
                 type="number"
                 className="input input-sm input-bordered w-24"
-                value={tp.multiple ?? tp.ratio}
+                value={tp.multiple ?? tp.ratio ?? 0}
                 onChange={(e) => {
                   const updated = [...parsed];
-                  if (tp.multiple !== undefined) updated[idx].multiple = parseFloat(e.target.value);
-                  if (tp.ratio !== undefined) updated[idx].ratio = parseFloat(e.target.value);
+                  const val = parseFloat(e.target.value);
+                  if (tp.multiple !== undefined) updated[idx].multiple = val;
+                  if (tp.ratio !== undefined) updated[idx].ratio = val;
                   setLocalValue(JSON.stringify(updated));
                   setDirty(true);
                 }}
@@ -133,9 +137,7 @@ function BotConfigPage() {
             className="btn btn-xs btn-outline"
             onClick={() => {
               const field = key.includes('step') ? 'ratio' : 'multiple';
-              setLocalValue(
-                JSON.stringify([...parsed, { [field]: 2, percent: 10 }])
-              );
+              setLocalValue(JSON.stringify([...parsed, { [field]: 2, percent: 10 }]));
               setDirty(true);
             }}
           >
@@ -238,7 +240,7 @@ function BotConfigPage() {
             <tbody>
               {strategyConfigs
                 .filter(
-                  (cfg) =>
+                  (cfg: StrategyRow) =>
                     !cfg.key.startsWith('trailing_') &&
                     !cfg.key.startsWith('simple_') &&
                     !cfg.key.startsWith('whale_wallet_') &&
@@ -255,7 +257,7 @@ function BotConfigPage() {
         </div>
       </div>
 
-      {/* Whale Wallets */}
+      {/* Whale Wallets Inline */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">Whale Wallets</h2>
@@ -269,7 +271,7 @@ function BotConfigPage() {
             </thead>
             <tbody>
               {strategyConfigs
-                .filter((cfg) => cfg.key.startsWith('whale_wallet_'))
+                .filter((cfg: StrategyRow) => cfg.key.startsWith('whale_wallet_'))
                 .map((row, i) => {
                   const [local, setLocal] = useState(row.value);
                   const save = () =>
