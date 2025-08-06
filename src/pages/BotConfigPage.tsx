@@ -14,7 +14,8 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { cn } from '../lib/utils'; // Utility for className merging (create if not exists)
+import { cn } from '../lib/utils';
+
 type BotConfigRow = {
   key: string;
   value: string;
@@ -32,6 +33,7 @@ type StrategyRow = {
   value: string;
   description: string;
 };
+
 function parseTakeProfit(value: string): { multiple?: number; ratio?: number; percent: number }[] {
   try {
     const parsed = JSON.parse(value);
@@ -57,6 +59,7 @@ function parseTakeProfit(value: string): { multiple?: number; ratio?: number; pe
     return [];
   }
 }
+
 function displayLabel(key: string): string {
   const map: Record<string, string> = {
     trailing_initial_stop_loss_ratio: 'Sell if Price Drops By',
@@ -72,6 +75,7 @@ function displayLabel(key: string): string {
   };
   return map[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
+
 function getTooltip(key: string): string {
   const tips: Record<string, string> = {
     active_strategy: 'Choose how the bot decides when to sell tokens. "Trailing" adjusts the sell price dynamically as the token price rises, while "Simple" uses fixed profit and loss targets. Example: Trailing might sell after a 20% drop from a peak, while Simple sells at a fixed 50% profit.',
@@ -87,6 +91,7 @@ function getTooltip(key: string): string {
   };
   return tips[key] || 'No description available.';
 }
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
     super(props);
@@ -102,12 +107,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
     return this.props.children;
   }
 }
+
 function EditableField({ row, isBotConfig = false, isDescription = false, onSave }: { row: StrategyRow | BotConfigRow, isBotConfig?: boolean, isDescription?: boolean, onSave: (value: string) => void }) {
   const key = row.key;
   const rawValue = isDescription ? (row as BotConfigRow).description : row.value;
   const [localValue, setLocalValue] = useState(rawValue);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+
   const validateInput = (value: string): string | null => {
     if (key === 'active_strategy') {
       if (!['trailing', 'simple'].includes(value.toLowerCase())) {
@@ -135,6 +142,7 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
     }
     return null;
   };
+
   const save = () => {
     const validationError = validateInput(localValue);
     if (validationError) {
@@ -145,6 +153,7 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
     setError(null);
     setDirty(false);
   };
+
   return (
     <div className="form-control">
       <input
@@ -173,14 +182,16 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
     </div>
   );
 }
+
 function EditableTakeProfit({ row, onSave }: { row: StrategyRow, onSave: (value: string) => void }) {
   const [localValue, setLocalValue] = useState(row.value);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const parsed = parseTakeProfit(localValue);
+
   const save = () => {
     try {
-      JSON.parse(localValue); // Validate JSON
+      JSON.parse(localValue);
       onSave(localValue);
       setError(null);
       setDirty(false);
@@ -188,6 +199,7 @@ function EditableTakeProfit({ row, onSave }: { row: StrategyRow, onSave: (value:
       setError('Invalid JSON format for profit levels');
     }
   };
+
   return (
     <div className="card bg-base-200 shadow-sm p-4">
       <div className="text-sm font-medium mb-2">Profit Levels</div>
@@ -272,6 +284,7 @@ function EditableTakeProfit({ row, onSave }: { row: StrategyRow, onSave: (value:
     </div>
   );
 }
+
 function WhaleRow({
   row,
   updateWhale,
@@ -285,6 +298,7 @@ function WhaleRow({
   const [localDescription, setLocalDescription] = useState(row.description);
   const [localActive, setLocalActive] = useState(row.active);
   const [error, setError] = useState<string | null>(null);
+
   const save = (field: 'address' | 'description' | 'active') => {
     if (field === 'address' && localAddress.length < 32) {
       setError('Wallet address must be a valid Solana address (at least 32 characters)');
@@ -297,6 +311,7 @@ function WhaleRow({
     });
     setError(null);
   };
+
   return (
     <tr>
       <td>
@@ -341,13 +356,14 @@ function WhaleRow({
     </tr>
   );
 }
+
 function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
   const [newWhaleAddress, setNewWhaleAddress] = useState('');
   const [newWhaleDescription, setNewWhaleDescription] = useState('');
   const [showBotConfigs, setShowBotConfigs] = useState(false);
-  const [showInactiveStrategy, setShowInactiveStrategy] = useState(false);
+
   const { data: botConfigs, isLoading: botConfigsLoading } = useQuery<BotConfigRow[]>({
     queryKey: ['bot_configs'],
     queryFn: async () => {
@@ -356,6 +372,7 @@ function BotConfigPage() {
       return data;
     },
   });
+
   const { data: whaleWallets, isLoading: whaleWalletsLoading } = useQuery<WhaleRow[]>({
     queryKey: ['whale_wallets'],
     queryFn: async () => {
@@ -364,6 +381,7 @@ function BotConfigPage() {
       return data;
     },
   });
+
   const { data: strategyConfigsRaw, isLoading: strategyConfigsLoading } = useQuery<StrategyRow[]>({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
@@ -372,12 +390,14 @@ function BotConfigPage() {
       return data;
     },
   });
+
   useEffect(() => {
     if (strategyConfigsRaw) {
       const active = strategyConfigsRaw.find((d) => d.key === 'active_strategy')?.value || 'trailing';
       setActiveStrategy(active);
     }
   }, [strategyConfigsRaw]);
+
   const updateBotConfig = useMutation({
     mutationFn: async ({ key, value, description }: { key: string; value: string; description: string }) => {
       const { error } = await supabase.from('bot_config').upsert({ key, value, description });
@@ -385,6 +405,7 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bot_configs'] }),
   });
+
   const updateWhale = useMutation({
     mutationFn: async ({ address, active, description }: { address: string; active: boolean; description: string }) => {
       const { error } = await supabase.from('whale_wallets').upsert({ address, active, description });
@@ -392,6 +413,7 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
   });
+
   const deleteWhale = useMutation({
     mutationFn: async (address: string) => {
       const { error } = await supabase.from('whale_wallets').delete().eq('address', address);
@@ -399,6 +421,7 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
   });
+
   const addWhale = useMutation({
     mutationFn: async ({ address, description }: { address: string; description: string }) => {
       if (address.length < 32) throw new Error('Invalid Solana address');
@@ -414,6 +437,7 @@ function BotConfigPage() {
       alert(`Failed to add wallet: ${error.message}`);
     },
   });
+
   const updateStrategyConfig = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
       const current = strategyConfigsRaw?.find((cfg) => cfg.key === key);
@@ -426,16 +450,18 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['strategy_configs'] }),
   });
+
   const strategyConfigs: StrategyRow[] = strategyConfigsRaw ?? [];
-  const trailingKeys = strategyConfigs.filter((cfg) => cfg.key.startsWith('trailing_') || cfg.key === 'active_strategy');
-  const simpleKeys = strategyConfigs.filter((cfg) => cfg.key.startsWith('simple_') || cfg.key === 'active_strategy');
-  const activeKeys = activeStrategy === 'trailing' ? trailingKeys : simpleKeys;
-  const inactiveKeys = activeStrategy === 'trailing' ? simpleKeys : trailingKeys;
+  const activeKeys = strategyConfigs.filter((cfg) => 
+    cfg.key === 'active_strategy' || cfg.key.startsWith(activeStrategy === 'trailing' ? 'trailing_' : 'simple_')
+  );
+
   const handleAddWhale = () => {
     if (newWhaleAddress) {
       addWhale.mutate({ address: newWhaleAddress, description: newWhaleDescription });
     }
   };
+
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8">
       <div className="flex items-center gap-3">
@@ -446,64 +472,85 @@ function BotConfigPage() {
         <div>
           <Info className="w-6 h-6" />
           <span>
-            Configure your trading bot here. Choose a strategy, set profit and loss rules, and track whale wallets. All changes save automatically. Hover over <Info className="w-4 h-4 inline" /> icons for help.
+            Configure your trading bot here. Set your trading strategy first, then manage whale wallets and general settings. Changes save automatically. Hover over <Info className="w-4 h-4 inline" /> icons for help.
           </span>
         </div>
       </div>
-      {/* Bot Configurations Section */}
+      {/* Trading Strategy Section */}
       <ErrorBoundary>
         <div className="card bg-base-100 border border-base-300 shadow-lg">
           <div className="card-body">
-            <button
-              className="flex items-center gap-2 text-lg font-semibold mb-4"
-              onClick={() => setShowBotConfigs(!showBotConfigs)}
-            >
-              <h2>General Bot Settings</h2>
-              {showBotConfigs ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-            </button>
-            {showBotConfigs && (
+            <h2 className="text-lg font-semibold mb-4">Trading Strategy</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Choose how the bot sells tokens after buying them. The "Trailing" strategy adjusts sell points as prices rise, while "Simple" uses fixed profit and loss targets. Only the active strategy's settings are shown to prevent mistakes.
+            </p>
+            {strategyConfigsLoading ? (
+              <div className="loading loading-spinner loading-md text-primary" />
+            ) : !strategyConfigs || strategyConfigs.length === 0 ? (
+              <p className="text-sm text-gray-500">No strategy settings found. Contact support.</p>
+            ) : (
               <>
-                <p className="text-sm text-gray-500 mb-4">
-                  These settings control how the bot operates, like transaction fees, retry limits, and how much SOL to spend per trade. Adjust carefully, as they affect all trades.
-                </p>
-                {botConfigsLoading ? (
-                  <div className="loading loading-spinner loading-md text-primary" />
-                ) : !botConfigs || botConfigs.length === 0 ? (
-                  <p className="text-sm text-gray-500">No settings found. Contact support.</p>
-                ) : (
-                  <table className="table w-full">
-                    <thead className="bg-base-200">
+                <div className="form-control mb-6">
+                  <label className="label font-medium text-sm">Choose Active Strategy <Info className="w-4 h-4 inline ml-1" data-tip={getTooltip('active_strategy')} /></label>
+                  <div className="flex gap-4">
+                    {['trailing', 'simple'].map((type) => (
+                      <label key={type} className="label cursor-pointer flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="strategy"
+                          className="radio radio-primary"
+                          checked={activeStrategy === type}
+                          onChange={() => {
+                            setActiveStrategy(type);
+                            updateStrategyConfig.mutate({ key: 'active_strategy', value: type });
+                          }}
+                        />
+                        <span className="label-text capitalize font-medium">{type}</span>
+                        <span className="badge badge-outline badge-sm">{type === 'trailing' ? 'Dynamic, tracks price peaks' : 'Fixed profit/loss targets'}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <h3 className="text-md font-medium mb-3">{activeStrategy.charAt(0).toUpperCase() + activeStrategy.slice(1)} Strategy Settings</h3>
+                <table className="table w-full">
+                  <thead className="bg-base-200">
+                    <tr>
+                      <th>Setting</th>
+                      <th>Value</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeKeys.length === 0 ? (
                       <tr>
-                        <th>Setting</th>
-                        <th>Value</th>
-                        <th>Description</th>
+                        <td colSpan={3} className="text-sm text-gray-500">
+                          No settings found for {activeStrategy} strategy.
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {botConfigs.map((row, i) => (
+                    ) : (
+                      activeKeys.map((row, i) => (
                         <tr key={i}>
-                          <td className="font-medium">{row.key}</td>
-                          <td>
-                            <EditableField
-                              row={row}
-                              isBotConfig={true}
-                              isDescription={false}
-                              onSave={(value) => updateBotConfig.mutate({ key: row.key, value, description: row.description })}
-                            />
+                          <td className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {displayLabel(row.key)}
+                              <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
+                                <Info className="w-4 h-4 text-blue-400" />
+                              </div>
+                            </div>
                           </td>
                           <td>
-                            <EditableField
-                              row={row}
-                              isBotConfig={true}
-                              isDescription={true}
-                              onSave={(description) => updateBotConfig.mutate({ key: row.key, value: row.value, description })}
-                            />
+                            {row.key.includes('take_profit_levels') || row.key.includes('take_profit_steps') ? (
+                              <EditableTakeProfit row={row} onSave={(value) => updateStrategyConfig.mutate({ key: row.key, value })} />
+                            ) : (
+                              <EditableField row={row} onSave={(value) => updateStrategyConfig.mutate({ key: row.key, value })} />
+                            )}
                           </td>
+                          <td className="text-sm text-gray-500">{getTooltip(row.key)}</td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </>
             )}
           </div>
@@ -573,131 +620,59 @@ function BotConfigPage() {
           </div>
         </div>
       </ErrorBoundary>
-      {/* Trading Strategies Section */}
+      {/* General Bot Settings Section */}
       <ErrorBoundary>
         <div className="card bg-base-100 border border-base-300 shadow-lg">
           <div className="card-body">
-            <h2 className="text-lg font-semibold mb-4">Trading Strategy</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              Choose how the bot sells tokens after buying them. The "Trailing" strategy adjusts sell points as prices rise, while "Simple" uses fixed profit and loss targets. Adjust settings to control when and how much to sell.
-            </p>
-            {strategyConfigsLoading ? (
-              <div className="loading loading-spinner loading-md text-primary" />
-            ) : !strategyConfigs || strategyConfigs.length === 0 ? (
-              <p className="text-sm text-gray-500">No strategy settings found. Contact support.</p>
-            ) : (
+            <button
+              className="flex items-center gap-2 text-lg font-semibold mb-4"
+              onClick={() => setShowBotConfigs(!showBotConfigs)}
+            >
+              <h2>General Bot Settings</h2>
+              {showBotConfigs ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </button>
+            {showBotConfigs && (
               <>
-                <div className="form-control mb-6">
-                  <label className="label font-medium text-sm">Choose Active Strategy <Info className="w-4 h-4 inline ml-1" data-tip={getTooltip('active_strategy')} /></label>
-                  <div className="flex gap-4">
-                    {['trailing', 'simple'].map((type) => (
-                      <label key={type} className="label cursor-pointer flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="strategy"
-                          className="radio radio-primary"
-                          checked={activeStrategy === type}
-                          onChange={() => {
-                            setActiveStrategy(type);
-                            updateStrategyConfig.mutate({ key: 'active_strategy', value: type });
-                          }}
-                        />
-                        <span className="label-text capitalize font-medium">{type}</span>
-                        <span className="badge badge-outline badge-sm">{type === 'trailing' ? 'Dynamic, tracks price peaks' : 'Fixed profit/loss targets'}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <h3 className="text-md font-medium mb-3">{activeStrategy.charAt(0).toUpperCase() + activeStrategy.slice(1)} Strategy Settings</h3>
-                <table className="table w-full">
-                  <thead className="bg-base-200">
-                    <tr>
-                      <th>Setting</th>
-                      <th>Value</th>
-                      <th>Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeKeys.length === 0 ? (
+                <p className="text-sm text-gray-500 mb-4">
+                  These settings control how the bot operates, like transaction fees, retry limits, and how much SOL to spend per trade. Adjust carefully, as they affect all trades.
+                </p>
+                {botConfigsLoading ? (
+                  <div className="loading loading-spinner loading-md text-primary" />
+                ) : !botConfigs || botConfigs.length === 0 ? (
+                  <p className="text-sm text-gray-500">No settings found. Contact support.</p>
+                ) : (
+                  <table className="table w-full">
+                    <thead className="bg-base-200">
                       <tr>
-                        <td colSpan={3} className="text-sm text-gray-500">
-                          No settings found for {activeStrategy} strategy.
-                        </td>
+                        <th>Setting</th>
+                        <th>Value</th>
+                        <th>Description</th>
                       </tr>
-                    ) : (
-                      activeKeys.map((row, i) => (
+                    </thead>
+                    <tbody>
+                      {botConfigs.map((row, i) => (
                         <tr key={i}>
-                          <td className="font-medium">
-                            <div className="flex items-center gap-2">
-                              {displayLabel(row.key)}
-                              <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
-                                <Info className="w-4 h-4 text-blue-400" />
-                              </div>
-                            </div>
+                          <td className="font-medium">{row.key}</td>
+                          <td>
+                            <EditableField
+                              row={row}
+                              isBotConfig={true}
+                              isDescription={false}
+                              onSave={(value) => updateBotConfig.mutate({ key: row.key, value, description: row.description })}
+                            />
                           </td>
                           <td>
-                            {row.key.includes('take_profit_levels') || row.key.includes('take_profit_steps') ? (
-                              <EditableTakeProfit row={row} onSave={(value) => updateStrategyConfig.mutate({ key: row.key, value })} />
-                            ) : (
-                              <EditableField row={row} onSave={(value) => updateStrategyConfig.mutate({ key: row.key, value })} />
-                            )}
+                            <EditableField
+                              row={row}
+                              isBotConfig={true}
+                              isDescription={true}
+                              onSave={(description) => updateBotConfig.mutate({ key: row.key, value: row.value, description })}
+                            />
                           </td>
-                          <td className="text-sm text-gray-500">{getTooltip(row.key)}</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-                <button
-                  className="btn btn-sm btn-outline mt-4"
-                  onClick={() => setShowInactiveStrategy(!showInactiveStrategy)}
-                >
-                  {showInactiveStrategy ? <ChevronUp className="w-4 h-4 mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
-                  {showInactiveStrategy ? 'Hide' : 'Show'} {activeStrategy === 'trailing' ? 'Simple' : 'Trailing'} Strategy Settings
-                </button>
-                {showInactiveStrategy && (
-                  <>
-                    <h3 className="text-md font-medium mt-6 mb-3">{activeStrategy === 'trailing' ? 'Simple' : 'Trailing'} Strategy Settings</h3>
-                    <table className="table w-full">
-                      <thead className="bg-base-200">
-                        <tr>
-                          <th>Setting</th>
-                          <th>Value</th>
-                          <th>Description</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {inactiveKeys.length === 0 ? (
-                          <tr>
-                            <td colSpan={3} className="text-sm text-gray-500">
-                              No settings found for {activeStrategy === 'trailing' ? 'simple' : 'trailing'} strategy.
-                            </td>
-                          </tr>
-                        ) : (
-                          inactiveKeys.map((row, i) => (
-                            <tr key={i}>
-                              <td className="font-medium">
-                                <div className="flex items-center gap-2">
-                                  {displayLabel(row.key)}
-                                  <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
-                                    <Info className="w-4 h-4 text-blue-400" />
-                                  </div>
-                                </div>
-                              </td>
-                              <td>
-                                {row.key.includes('take_profit_levels') || row.key.includes('take_profit_steps') ? (
-                                  <EditableTakeProfit row={row} onSave={(value) => updateStrategyConfig.mutate({ key: row.key, value })} />
-                                ) : (
-                                  <EditableField row={row} onSave={(value) => updateStrategyConfig.mutate({ key: row.key, value })} />
-                                )}
-                              </td>
-                              <td className="text-sm text-gray-500">{getTooltip(row.key)}</td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </>
             )}
@@ -707,4 +682,5 @@ function BotConfigPage() {
     </div>
   );
 }
+
 export default BotConfigPage;
