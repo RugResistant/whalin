@@ -1,3 +1,4 @@
+// src/pages/BotConfigPage.tsx
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import {
@@ -5,12 +6,6 @@ import {
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  type ColumnDef,
-} from '@tanstack/react-table';
 import {
   Settings,
   Wallet,
@@ -21,7 +16,12 @@ import {
   Info,
 } from 'lucide-react';
 
-function parseTakeProfit(value: string): { multiple: number; percent: number }[] {
+interface StrategyConfigRow {
+  key: string;
+  value: string;
+}
+
+function parseTakeProfit(value: string): { multiple?: number; ratio?: number; percent: number }[] {
   try {
     return JSON.parse(value);
   } catch {
@@ -36,7 +36,6 @@ function displayLabel(key: string): string {
     trailing_take_profit_levels: 'Take Profit Levels',
     trailing_activation_ratio: 'Trailing Activation (x)',
     trailing_cushion: 'Trailing Cushion %',
-
     simple_stop_loss_ratio: 'Stop Loss %',
     simple_take_profit_ratio: 'Take Profit (x)',
     simple_partial_sell_percent_at_take_profit: 'Partial Sell % at TP',
@@ -52,7 +51,6 @@ function getTooltip(key: string): string {
     trailing_take_profit_levels: 'E.g. [{ "multiple": 3, "percent": 30 }]',
     trailing_activation_ratio: 'Trailing stop activates after this x-multiple.',
     trailing_cushion: 'How much price must drop from peak to trigger sell.',
-
     simple_stop_loss_ratio: 'Sell if price drops below this % of buy.',
     simple_take_profit_ratio: 'Sell % of tokens at this multiple.',
     simple_partial_sell_percent_at_take_profit: 'What % to sell at TP ratio.',
@@ -60,22 +58,26 @@ function getTooltip(key: string): string {
   };
   return tips[key] || '';
 }
-
 function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
 
-  const { data: strategyConfigs = [] } = useQuery({
+  const {
+    data: strategyConfigs = [],
+  } = useQuery<StrategyConfigRow[]>({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
       const { data, error } = await supabase.from('strategy_config').select('*');
       if (error) throw error;
-      return data;
+      return data as StrategyConfigRow[];
     },
-    onSuccess: (data) => {
-      const active = data.find((d) => d.key === 'active_strategy')?.value || 'trailing';
-      setActiveStrategy(active);
-    },
+    staleTime: 1000 * 60,
+    gcTime: 1000 * 60 * 5,
+  });
+
+  useState(() => {
+    const active = strategyConfigs.find((d) => d.key === 'active_strategy')?.value || 'trailing';
+    setActiveStrategy(active);
   });
 
   const updateStrategyConfig = useMutation({
@@ -86,15 +88,10 @@ function BotConfigPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['strategy_configs'] }),
   });
 
-  const trailingKeys = strategyConfigs.filter((cfg) =>
-    cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
-  );
+  const filteredRows = (prefix: string) =>
+    strategyConfigs.filter((cfg) => cfg.key.startsWith(prefix) && activeStrategy === prefix.split('_')[0]);
 
-  const simpleKeys = strategyConfigs.filter((cfg) =>
-    cfg.key.startsWith('simple_') && activeStrategy === 'simple'
-  );
-
-  const renderEditableRow = (row: any) => {
+  const renderEditableRow = (row: StrategyConfigRow) => {
     const key = row.key;
     const rawValue = row.value;
     const [localValue, setLocalValue] = useState(rawValue);
@@ -105,9 +102,8 @@ function BotConfigPage() {
       setDirty(false);
     };
 
-    // JSON editable
     if (key.includes('take_profit_levels') || key.includes('take_profit_steps')) {
-      const parsed = parseTakeProfit(rawValue);
+      const parsed = parseTakeProfit(localValue);
       return (
         <div className="flex flex-col gap-2">
           {parsed.map((tp, idx) => (
@@ -115,7 +111,7 @@ function BotConfigPage() {
               <input
                 type="number"
                 className="input input-sm input-bordered w-24"
-                value={tp.multiple ?? tp.ratio}
+                value={tp.multiple ?? tp.ratio ?? 1}
                 onChange={(e) => {
                   const updated = [...parsed];
                   if (tp.multiple !== undefined) updated[idx].multiple = parseFloat(e.target.value);
@@ -129,8 +125,9 @@ function BotConfigPage() {
                 className="input input-sm input-bordered w-24"
                 value={tp.percent}
                 onChange={(e) => {
-                  parsed[idx].percent = parseFloat(e.target.value);
-                  setLocalValue(JSON.stringify(parsed));
+                  const updated = [...parsed];
+                  updated[idx].percent = parseFloat(e.target.value);
+                  setLocalValue(JSON.stringify(updated));
                   setDirty(true);
                 }}
               />
@@ -149,12 +146,9 @@ function BotConfigPage() {
             + Add
           </button>
           {dirty && (
-            <div className="mt-1 flex items-center gap-2">
-              <Save className="w-4 h-4 text-green-500" />
-              <button className="btn btn-xs btn-primary" onClick={save}>
-                Save
-              </button>
-            </div>
+            <button className="btn btn-xs btn-primary mt-1" onClick={save}>
+              <Save className="w-4 h-4 mr-1" /> Save
+            </button>
           )}
         </div>
       );
@@ -182,6 +176,32 @@ function BotConfigPage() {
     );
   };
 
+  const renderTable = (rows: StrategyConfigRow[]) => (
+    <div className="overflow-x-auto">
+      <table className="table table-sm w-full">
+        <thead className="bg-base-200">
+          <tr>
+            <th>Setting</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i}>
+              <td className="flex items-center gap-2 font-medium">
+                {displayLabel(row.key)}
+                <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
+                  <Info className="w-4 h-4 text-blue-400" />
+                </div>
+              </td>
+              <td>{renderEditableRow(row)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       <div className="flex items-center gap-3">
@@ -191,22 +211,17 @@ function BotConfigPage() {
 
       <div className="flex gap-3 items-center">
         <span className="font-medium">Active Strategy:</span>
-        <button
-          className={`btn btn-sm ${activeStrategy === 'trailing' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() =>
-            updateStrategyConfig.mutate({ key: 'active_strategy', value: 'trailing' })
-          }
-        >
-          Trailing
-        </button>
-        <button
-          className={`btn btn-sm ${activeStrategy === 'simple' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() =>
-            updateStrategyConfig.mutate({ key: 'active_strategy', value: 'simple' })
-          }
-        >
-          Simple
-        </button>
+        {['trailing', 'simple'].map((type) => (
+          <button
+            key={type}
+            className={`btn btn-sm ${activeStrategy === type ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() =>
+              updateStrategyConfig.mutate({ key: 'active_strategy', value: type })
+            }
+          >
+            {type[0].toUpperCase() + type.slice(1)}
+          </button>
+        ))}
       </div>
 
       <div className="card bg-base-100 border border-base-300 shadow-md">
@@ -214,54 +229,22 @@ function BotConfigPage() {
           <h2 className="text-xl font-semibold mb-4">
             {activeStrategy === 'trailing' ? 'Trailing Strategy Settings' : 'Simple Strategy Settings'}
           </h2>
-          <div className="overflow-x-auto">
-            <table className="table table-sm w-full">
-              <thead className="bg-base-200">
-                <tr>
-                  <th>Setting</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(activeStrategy === 'trailing' ? trailingKeys : simpleKeys).map((row, i) => (
-                  <tr key={i}>
-                    <td className="flex items-center gap-2 font-medium">
-                      {displayLabel(row.key)}
-                      <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
-                        <Info className="w-4 h-4 text-blue-400" />
-                      </div>
-                    </td>
-                    <td>{renderEditableRow(row)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {renderTable(filteredRows(`${activeStrategy}_`))}
         </div>
       </div>
+
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">Global Settings</h2>
-          <div className="overflow-x-auto">
-            <table className="table table-sm w-full">
-              <thead className="bg-base-200">
-                <tr>
-                  <th>Setting</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {strategyConfigs
-                  .filter((cfg) => !cfg.key.startsWith('trailing_') && !cfg.key.startsWith('simple_') && cfg.key !== 'active_strategy')
-                  .map((row, i) => (
-                    <tr key={i}>
-                      <td className="font-medium">{row.key}</td>
-                      <td>{renderEditableRow(row)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+          {renderTable(
+            strategyConfigs.filter(
+              (cfg) =>
+                !cfg.key.startsWith('trailing_') &&
+                !cfg.key.startsWith('simple_') &&
+                cfg.key !== 'active_strategy' &&
+                !cfg.key.startsWith('whale_wallet_')
+            )
+          )}
         </div>
       </div>
 
