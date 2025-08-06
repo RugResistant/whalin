@@ -55,127 +55,10 @@ function getTooltip(key: string): string {
   };
   return tips[key] || '';
 }
-
-const EditableCell = ({ row, onSave }: { row: StrategyRow; onSave: (key: string, value: string) => void }) => {
-  const key = row.key;
-  const rawValue = row.value;
-  const [localValue, setLocalValue] = useState(rawValue);
-  const [dirty, setDirty] = useState(false);
-  const save = () => {
-    onSave(key, localValue);
-    setDirty(false);
-  };
-  if (key.includes('take_profit_levels') || key.includes('take_profit_steps')) {
-    const parsed = parseTakeProfit(localValue);
-    return (
-      <div className="flex flex-col gap-2">
-        {parsed.map((tp, idx) => (
-          <div key={idx} className="flex gap-2 items-center">
-            <input
-              type="number"
-              className="input input-sm input-bordered w-24"
-              value={tp.multiple ?? tp.ratio}
-              onChange={(e) => {
-                const updated = parsed.map((item, index) =>
-                  index === idx
-                    ? {
-                        ...item,
-                        multiple: item.multiple !== undefined ? parseFloat(e.target.value) : undefined,
-                        ratio: item.ratio !== undefined ? parseFloat(e.target.value) : undefined,
-                      }
-                    : item
-                );
-                setLocalValue(JSON.stringify(updated));
-                setDirty(true);
-              }}
-            />
-            <input
-              type="number"
-              className="input input-sm input-bordered w-24"
-              value={tp.percent}
-              onChange={(e) => {
-                const updated = parsed.map((item, index) =>
-                  index === idx ? { ...item, percent: parseFloat(e.target.value) } : item
-                );
-                setLocalValue(JSON.stringify(updated));
-                setDirty(true);
-              }}
-            />
-          </div>
-        ))}
-        <button
-          className="btn btn-xs btn-outline"
-          onClick={() => {
-            const field = key.includes('step') ? 'ratio' : 'multiple';
-            setLocalValue(
-              JSON.stringify([...parsed, { [field]: 2, percent: 10 }])
-            );
-            setDirty(true);
-          }}
-        >
-          + Add
-        </button>
-        {dirty && (
-          <div className="mt-1 flex items-center gap-2">
-            <Save className="w-4 h-4 text-green-500" />
-            <button className="btn btn-xs btn-primary" onClick={save}>
-              Save
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        type="text"
-        className="input input-sm input-bordered w-48"
-        value={localValue}
-        onChange={(e) => {
-          setLocalValue(e.target.value);
-          setDirty(true);
-        }}
-        onBlur={() => {
-          if (dirty && localValue !== rawValue) {
-            save();
-          }
-        }}
-      />
-      {dirty && <Save className="w-4 h-4 text-green-500" />}
-    </div>
-  );
-};
-
-const WhaleWalletRow = ({ row, onSave, onDelete }: { row: StrategyRow; onSave: (key: string, value: string) => void; onDelete: (key: string) => void }) => {
-  const [local, setLocal] = useState(row.value);
-  const save = () => onSave(row.key, local);
-  return (
-    <tr>
-      <td>{row.key.replace('whale_wallet_', '')}</td>
-      <td>
-        <input
-          className="input input-sm input-bordered w-full"
-          value={local}
-          onChange={(e) => setLocal(e.target.value)}
-          onBlur={save}
-        />
-      </td>
-      <td>
-        <button
-          className="btn btn-xs btn-error"
-          onClick={() => onDelete(row.key)}
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </td>
-    </tr>
-  );
-};
-
 function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
+
   const { data: strategyConfigs = [] } = useQuery<StrategyRow[]>({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
@@ -183,12 +66,12 @@ function BotConfigPage() {
       if (error) throw error;
       return data as StrategyRow[];
     },
+    // @ts-ignore
+    onSuccess: (data) => {
+      const active = data.find((d) => d.key === 'active_strategy')?.value || 'trailing';
+      setActiveStrategy(active);
+    },
   });
-
-  useEffect(() => {
-    const active = strategyConfigs.find((d: StrategyRow) => d.key === 'active_strategy')?.value || 'trailing';
-    setActiveStrategy(active);
-  }, [strategyConfigs]);
 
   const updateStrategyConfig = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
@@ -199,18 +82,104 @@ function BotConfigPage() {
   });
 
   const trailingKeys = strategyConfigs.filter(
-    (cfg: StrategyRow) => cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
+    (cfg) => cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
   );
   const simpleKeys = strategyConfigs.filter(
-    (cfg: StrategyRow) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
+    (cfg) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
   );
 
+  const renderEditableRow = (row: StrategyRow) => {
+    const key = row.key;
+    const rawValue = row.value;
+    const [localValue, setLocalValue] = useState(rawValue);
+    const [dirty, setDirty] = useState(false);
+
+    const save = () => {
+      updateStrategyConfig.mutate({ key, value: localValue });
+      setDirty(false);
+    };
+
+    if (key.includes('take_profit_levels') || key.includes('take_profit_steps')) {
+      const parsed = parseTakeProfit(localValue);
+      return (
+        <div className="flex flex-col gap-2">
+          {parsed.map((tp, idx) => (
+            <div key={idx} className="flex gap-2 items-center">
+              <input
+                type="number"
+                className="input input-sm input-bordered w-24"
+                value={tp.multiple ?? tp.ratio}
+                onChange={(e) => {
+                  const updated = [...parsed];
+                  if (tp.multiple !== undefined) updated[idx].multiple = parseFloat(e.target.value);
+                  if (tp.ratio !== undefined) updated[idx].ratio = parseFloat(e.target.value);
+                  setLocalValue(JSON.stringify(updated));
+                  setDirty(true);
+                }}
+              />
+              <input
+                type="number"
+                className="input input-sm input-bordered w-24"
+                value={tp.percent}
+                onChange={(e) => {
+                  parsed[idx].percent = parseFloat(e.target.value);
+                  setLocalValue(JSON.stringify(parsed));
+                  setDirty(true);
+                }}
+              />
+            </div>
+          ))}
+          <button
+            className="btn btn-xs btn-outline"
+            onClick={() => {
+              const field = key.includes('step') ? 'ratio' : 'multiple';
+              setLocalValue(
+                JSON.stringify([...parsed, { [field]: 2, percent: 10 }])
+              );
+              setDirty(true);
+            }}
+          >
+            + Add
+          </button>
+          {dirty && (
+            <div className="mt-1 flex items-center gap-2">
+              <Save className="w-4 h-4 text-green-500" />
+              <button className="btn btn-xs btn-primary" onClick={save}>
+                Save
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          className="input input-sm input-bordered w-48"
+          value={localValue}
+          onChange={(e) => {
+            setLocalValue(e.target.value);
+            setDirty(true);
+          }}
+          onBlur={() => {
+            if (dirty && localValue !== rawValue) {
+              save();
+            }
+          }}
+        />
+        {dirty && <Save className="w-4 h-4 text-green-500" />}
+      </div>
+    );
+  };
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       <div className="flex items-center gap-3">
         <Settings className="w-6 h-6 text-primary" />
         <h1 className="text-3xl font-bold">Bot Sell Strategy Configuration</h1>
       </div>
+
       <div className="flex gap-3 items-center">
         <span className="font-medium">Active Strategy:</span>
         {['trailing', 'simple'].map((type) => (
@@ -225,6 +194,7 @@ function BotConfigPage() {
           </button>
         ))}
       </div>
+
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">
@@ -238,7 +208,7 @@ function BotConfigPage() {
               </tr>
             </thead>
             <tbody>
-              {(activeStrategy === 'trailing' ? trailingKeys : simpleKeys).map((row: StrategyRow, i: number) => (
+              {(activeStrategy === 'trailing' ? trailingKeys : simpleKeys).map((row, i) => (
                 <tr key={i}>
                   <td className="flex items-center gap-2 font-medium">
                     {displayLabel(row.key)}
@@ -246,18 +216,14 @@ function BotConfigPage() {
                       <Info className="w-4 h-4 text-blue-400" />
                     </div>
                   </td>
-                  <td>
-                    <EditableCell
-                      row={row}
-                      onSave={(key, value) => updateStrategyConfig.mutate({ key, value })}
-                    />
-                  </td>
+                  <td>{renderEditableRow(row)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
       {/* Global Settings */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
@@ -272,28 +238,24 @@ function BotConfigPage() {
             <tbody>
               {strategyConfigs
                 .filter(
-                  (cfg: StrategyRow) =>
+                  (cfg) =>
                     !cfg.key.startsWith('trailing_') &&
                     !cfg.key.startsWith('simple_') &&
                     !cfg.key.startsWith('whale_wallet_') &&
                     cfg.key !== 'active_strategy'
                 )
-                .map((row: StrategyRow, i: number) => (
+                .map((row, i) => (
                   <tr key={i}>
                     <td>{row.key}</td>
-                    <td>
-                      <EditableCell
-                        row={row}
-                        onSave={(key, value) => updateStrategyConfig.mutate({ key, value })}
-                      />
-                    </td>
+                    <td>{renderEditableRow(row)}</td>
                   </tr>
                 ))}
             </tbody>
           </table>
         </div>
       </div>
-      {/* Whale Wallets Inline */}
+
+      {/* Whale Wallets */}
       <div className="card bg-base-100 border border-base-300 shadow-md">
         <div className="card-body">
           <h2 className="text-xl font-semibold mb-4">Whale Wallets</h2>
@@ -307,23 +269,42 @@ function BotConfigPage() {
             </thead>
             <tbody>
               {strategyConfigs
-                .filter((cfg: StrategyRow) => cfg.key.startsWith('whale_wallet_'))
-                .map((row: StrategyRow, i: number) => (
-                  <WhaleWalletRow
-                    key={i}
-                    row={row}
-                    onSave={(key, value) => updateStrategyConfig.mutate({ key, value })}
-                    onDelete={(key) =>
-                      supabase
-                        .from('strategy_config')
-                        .delete()
-                        .eq('key', key)
-                        .then(() =>
-                          queryClient.invalidateQueries({ queryKey: ['strategy_configs'] })
-                        )
-                    }
-                  />
-                ))}
+                .filter((cfg) => cfg.key.startsWith('whale_wallet_'))
+                .map((row, i) => {
+                  const [local, setLocal] = useState(row.value);
+                  const save = () =>
+                    updateStrategyConfig.mutate({ key: row.key, value: local });
+
+                  return (
+                    <tr key={i}>
+                      <td>{row.key.replace('whale_wallet_', '')}</td>
+                      <td>
+                        <input
+                          className="input input-sm input-bordered w-full"
+                          value={local}
+                          onChange={(e) => setLocal(e.target.value)}
+                          onBlur={save}
+                        />
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-xs btn-error"
+                          onClick={() =>
+                            supabase
+                              .from('strategy_config')
+                              .delete()
+                              .eq('key', row.key)
+                              .then(() =>
+                                queryClient.invalidateQueries({ queryKey: ['strategy_configs'] })
+                              )
+                          }
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
           <button
