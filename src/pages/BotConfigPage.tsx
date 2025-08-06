@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   useQuery,
@@ -33,6 +33,7 @@ function displayLabel(key: string): string {
     trailing_take_profit_levels: 'Take Profit Levels',
     trailing_activation_ratio: 'Trailing Activation (x)',
     trailing_cushion: 'Trailing Cushion %',
+
     simple_stop_loss_ratio: 'Stop Loss %',
     simple_take_profit_ratio: 'Take Profit (x)',
     simple_partial_sell_percent_at_take_profit: 'Partial Sell % at TP',
@@ -48,6 +49,7 @@ function getTooltip(key: string): string {
     trailing_take_profit_levels: 'E.g. [{ "multiple": 3, "percent": 30 }]',
     trailing_activation_ratio: 'Trailing stop activates after this x-multiple.',
     trailing_cushion: 'How much price must drop from peak to trigger sell.',
+
     simple_stop_loss_ratio: 'Sell if price drops below this % of buy.',
     simple_take_profit_ratio: 'Sell % of tokens at this multiple.',
     simple_partial_sell_percent_at_take_profit: 'What % to sell at TP ratio.',
@@ -59,9 +61,7 @@ function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
 
-  const {
-    data: strategyConfigs = [],
-  } = useQuery<StrategyRow[]>({
+  const { data: strategyConfigs = [] } = useQuery<StrategyRow[]>({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
       const { data, error } = await supabase.from('strategy_config').select('*');
@@ -83,19 +83,19 @@ function BotConfigPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['strategy_configs'] }),
   });
 
-  const trailingKeys = strategyConfigs.filter(
+  const trailingKeys = (strategyConfigs || []).filter(
     (cfg: StrategyRow) => cfg.key.startsWith('trailing_') && activeStrategy === 'trailing'
   );
 
-  const simpleKeys = strategyConfigs.filter(
+  const simpleKeys = (strategyConfigs || []).filter(
     (cfg: StrategyRow) => cfg.key.startsWith('simple_') && activeStrategy === 'simple'
   );
 
   const renderEditableRow = (row: StrategyRow) => {
     const key = row.key;
     const rawValue = row.value;
-    const [localValue, setLocalValue] = useState<string>(rawValue);
-    const [dirty, setDirty] = useState<boolean>(false);
+    const [localValue, setLocalValue] = useState(rawValue);
+    const [dirty, setDirty] = useState(false);
 
     const save = () => {
       updateStrategyConfig.mutate({ key, value: localValue });
@@ -111,12 +111,11 @@ function BotConfigPage() {
               <input
                 type="number"
                 className="input input-sm input-bordered w-24"
-                value={tp.multiple ?? tp.ratio ?? 0}
+                value={tp.multiple ?? tp.ratio}
                 onChange={(e) => {
                   const updated = [...parsed];
-                  const val = parseFloat(e.target.value);
-                  if (tp.multiple !== undefined) updated[idx].multiple = val;
-                  if (tp.ratio !== undefined) updated[idx].ratio = val;
+                  if (tp.multiple !== undefined) updated[idx].multiple = parseFloat(e.target.value);
+                  if (tp.ratio !== undefined) updated[idx].ratio = parseFloat(e.target.value);
                   setLocalValue(JSON.stringify(updated));
                   setDirty(true);
                 }}
@@ -238,7 +237,7 @@ function BotConfigPage() {
               </tr>
             </thead>
             <tbody>
-              {strategyConfigs
+              {(strategyConfigs || [])
                 .filter(
                   (cfg: StrategyRow) =>
                     !cfg.key.startsWith('trailing_') &&
@@ -270,7 +269,7 @@ function BotConfigPage() {
               </tr>
             </thead>
             <tbody>
-              {strategyConfigs
+              {(strategyConfigs || [])
                 .filter((cfg: StrategyRow) => cfg.key.startsWith('whale_wallet_'))
                 .map((row, i) => {
                   const [local, setLocal] = useState(row.value);
