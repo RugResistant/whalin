@@ -36,9 +36,25 @@ type StrategyRow = {
 function parseTakeProfit(value: string): { multiple?: number; ratio?: number; percent: number }[] {
   try {
     const parsed = JSON.parse(value);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(item => (item.multiple || item.ratio) && typeof item.percent === 'number');
-  } catch {
+    if (!Array.isArray(parsed)) {
+      console.warn(`[parseTakeProfit] Invalid take-profit data: not an array - ${value}`);
+      return [];
+    }
+    return parsed
+      .filter(item => {
+        const isValid = (typeof item.multiple === 'number' || typeof item.ratio === 'number') && typeof item.percent === 'number';
+        if (!isValid) {
+          console.warn(`[parseTakeProfit] Invalid take-profit item: ${JSON.stringify(item)}`);
+        }
+        return isValid;
+      })
+      .map(item => ({
+        multiple: item.multiple,
+        ratio: item.ratio,
+        percent: item.percent,
+      }));
+  } catch (error) {
+    console.warn(`[parseTakeProfit] Failed to parse take-profit value: ${value}`, error);
     return [];
   }
 }
@@ -73,7 +89,6 @@ function getTooltip(key: string): string {
   return tips[key] || 'No description available.';
 }
 
-// Error Boundary Component
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
     super(props);
@@ -86,7 +101,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 
   render() {
     if (this.state.hasError) {
-      return <div className="alert alert-error">Something went wrong rendering this section. Please refresh.</div>;
+      return <div className="alert alert-error">Something went wrong rendering this section. Please refresh or check your data.</div>;
     }
     return this.props.children;
   }
@@ -240,7 +255,7 @@ function BotConfigPage() {
                   type="number"
                   step="0.1"
                   min="1"
-                  className="input input-xs input-bordered"
+                  className={`input input-xs input-bordered ${error ? 'input-error' : ''}`}
                   value={tp.multiple ?? tp.ratio ?? 1}
                   onChange={(e) => {
                     const value = parseFloat(e.target.value);
@@ -249,8 +264,11 @@ function BotConfigPage() {
                       return;
                     }
                     const updated = [...parsed];
-                    if (tp.multiple !== undefined) updated[idx].multiple = value;
-                    if (tp.ratio !== undefined) updated[idx].ratio = value;
+                    if (key.includes('take_profit_levels')) {
+                      updated[idx].multiple = value;
+                    } else {
+                      updated[idx].ratio = value;
+                    }
                     setLocalValue(JSON.stringify(updated));
                     setError(null);
                     setDirty(true);
@@ -264,7 +282,7 @@ function BotConfigPage() {
                   step="1"
                   min="0"
                   max="100"
-                  className="input input-xs input-bordered"
+                  className={`input input-xs input-bordered ${error ? 'input-error' : ''}`}
                   value={tp.percent ?? 0}
                   onChange={(e) => {
                     const value = parseFloat(e.target.value);
@@ -316,7 +334,7 @@ function BotConfigPage() {
     return (
       <div className="form-control">
         <input
-          type="text"
+          type={key.includes('percent') || key.includes('ratio') || key.includes('multiple') || key.includes('cushion') ? 'number' : 'text'}
           step={key.includes('percent') ? '1' : '0.1'}
           min={key.includes('percent') ? '0' : key.includes('stop_loss_ratio') ? '0' : '1'}
           max={key.includes('percent') ? '100' : undefined}
@@ -375,7 +393,7 @@ function BotConfigPage() {
                 <tbody>
                   {botConfigs.map((row, i) => (
                     <tr key={i}>
-                      <td className="font-medium">{row.key}</td>
+                      <td className="font-medium">{displayLabel(row.key)}</td>
                       <td>{renderEditableRow(row, true)}</td>
                       <td className="text-sm text-gray-500">{row.description}</td>
                     </tr>
@@ -541,20 +559,28 @@ function BotConfigPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {activeKeys.map((row, i) => (
-                      <tr key={i}>
-                        <td className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {displayLabel(row.key)}
-                            <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
-                              <Info className="w-4 h-4 text-blue-400" />
-                            </div>
-                          </div>
+                    {activeKeys.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="text-sm text-gray-500">
+                          No settings found for {activeStrategy} strategy.
                         </td>
-                        <td>{renderEditableRow(row)}</td>
-                        <td className="text-sm text-gray-500">{getTooltip(row.key)}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      activeKeys.map((row, i) => (
+                        <tr key={i}>
+                          <td className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {displayLabel(row.key)}
+                              <div className="tooltip tooltip-right" data-tip={getTooltip(row.key)}>
+                                <Info className="w-4 h-4 text-blue-400" />
+                              </div>
+                            </div>
+                          </td>
+                          <td>{renderEditableRow(row)}</td>
+                          <td className="text-sm text-gray-500">{getTooltip(row.key)}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </>
