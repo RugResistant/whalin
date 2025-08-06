@@ -19,14 +19,12 @@ type BotConfigRow = {
   description: string;
   updated_at: string;
 };
-
 type WhaleRow = {
   address: string;
   active: boolean;
   added_at: string;
   description: string;
 };
-
 type StrategyRow = {
   key: string;
   value: string;
@@ -94,11 +92,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
     super(props);
     this.state = { hasError: false };
   }
-
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-
   render() {
     if (this.state.hasError) {
       return <div className="alert alert-error">Something went wrong rendering this section. Please refresh or check your data.</div>;
@@ -271,6 +267,70 @@ function EditableTakeProfit({ row, onSave }: { row: StrategyRow, onSave: (value:
   );
 }
 
+// New component for rendering a single whale row
+function WhaleRow({
+  row,
+  updateWhale,
+  deleteWhale,
+}: {
+  row: WhaleRow;
+  updateWhale: any; // Use the actual type from @tanstack/react-query if possible
+  deleteWhale: any;
+}) {
+  const [localAddress, setLocalAddress] = useState(row.address);
+  const [localDescription, setLocalDescription] = useState(row.description);
+  const [localActive, setLocalActive] = useState(row.active);
+
+  const save = (field: 'address' | 'description' | 'active') => {
+    updateWhale.mutate({
+      address: field === 'address' ? localAddress : row.address,
+      description: field === 'description' ? localDescription : row.description,
+      active: field === 'active' ? localActive : row.active,
+    });
+  };
+
+  return (
+    <tr>
+      <td>
+        <input
+          className="input input-sm input-bordered w-full"
+          value={localAddress}
+          onChange={(e) => setLocalAddress(e.target.value)}
+          onBlur={() => save('address')}
+        />
+      </td>
+      <td>
+        <input
+          className="input input-sm input-bordered w-full"
+          value={localDescription}
+          onChange={(e) => setLocalDescription(e.target.value)}
+          onBlur={() => save('description')}
+        />
+      </td>
+      <td>
+        <input
+          type="checkbox"
+          className="checkbox checkbox-sm"
+          checked={localActive}
+          onChange={(e) => {
+            setLocalActive(e.target.checked);
+            save('active');
+          }}
+        />
+      </td>
+      <td>{new Date(row.added_at).toLocaleString()}</td>
+      <td>
+        <button
+          className="btn btn-xs btn-error"
+          onClick={() => deleteWhale.mutate(row.address)}
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </td>
+    </tr>
+  );
+}
+
 function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
@@ -372,7 +432,6 @@ function BotConfigPage() {
         <Settings className="w-6 h-6 text-primary" />
         <h1 className="text-3xl font-bold">Bot Configuration</h1>
       </div>
-
       {/* Bot Configurations Section */}
       <ErrorBoundary>
         <div className="card bg-base-100 border border-base-300 shadow-md">
@@ -409,7 +468,6 @@ function BotConfigPage() {
           </div>
         </div>
       </ErrorBoundary>
-
       {/* Whale Wallets Section */}
       <ErrorBoundary>
         <div className="card bg-base-100 border border-base-300 shadow-md">
@@ -432,58 +490,14 @@ function BotConfigPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {whaleWallets.map((row, i) => {
-                      const [localAddress, setLocalAddress] = useState(row.address);
-                      const [localDescription, setLocalDescription] = useState(row.description);
-                      const [localActive, setLocalActive] = useState(row.active);
-                      const save = (field: 'address' | 'description' | 'active') => {
-                        updateWhale.mutate({
-                          address: field === 'address' ? localAddress : row.address,
-                          description: field === 'description' ? localDescription : row.description,
-                          active: field === 'active' ? localActive : row.active,
-                        });
-                      };
-                      return (
-                        <tr key={i}>
-                          <td>
-                            <input
-                              className="input input-sm input-bordered w-full"
-                              value={localAddress}
-                              onChange={(e) => setLocalAddress(e.target.value)}
-                              onBlur={() => save('address')}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              className="input input-sm input-bordered w-full"
-                              value={localDescription}
-                              onChange={(e) => setLocalDescription(e.target.value)}
-                              onBlur={() => save('description')}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="checkbox"
-                              className="checkbox checkbox-sm"
-                              checked={localActive}
-                              onChange={(e) => {
-                                setLocalActive(e.target.checked);
-                                save('active');
-                              }}
-                            />
-                          </td>
-                          <td>{new Date(row.added_at).toLocaleString()}</td>
-                          <td>
-                            <button
-                              className="btn btn-xs btn-error"
-                              onClick={() => deleteWhale.mutate(row.address)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {whaleWallets.map((row) => (
+                      <WhaleRow
+                        key={row.address}
+                        row={row}
+                        updateWhale={updateWhale}
+                        deleteWhale={deleteWhale}
+                      />
+                    ))}
                   </tbody>
                 </table>
                 <div className="mt-4 flex gap-4 items-end">
@@ -515,7 +529,6 @@ function BotConfigPage() {
           </div>
         </div>
       </ErrorBoundary>
-
       {/* Trading Strategies Section */}
       <ErrorBoundary>
         <div className="card bg-base-100 border border-base-300 shadow-md">
