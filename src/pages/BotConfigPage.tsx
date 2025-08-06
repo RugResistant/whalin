@@ -15,7 +15,6 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-
 type BotConfigRow = {
   key: string;
   value: string;
@@ -33,7 +32,6 @@ type StrategyRow = {
   value: string;
   description: string;
 };
-
 function parseTakeProfit(value: string): { multiple?: number; ratio?: number; percent: number }[] {
   try {
     const parsed = JSON.parse(value);
@@ -59,7 +57,6 @@ function parseTakeProfit(value: string): { multiple?: number; ratio?: number; pe
     return [];
   }
 }
-
 function displayLabel(key: string): string {
   const map: Record<string, string> = {
     trailing_initial_stop_loss_ratio: 'Sell if Price Drops By',
@@ -75,7 +72,6 @@ function displayLabel(key: string): string {
   };
   return map[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
-
 function getTooltip(key: string): string {
   const tips: Record<string, string> = {
     active_strategy: 'Choose how the bot decides when to sell tokens. "Trailing" adjusts the sell price dynamically as the token price rises, while "Simple" uses fixed profit and loss targets. Example: Trailing might sell after a 20% drop from a peak, while Simple sells at a fixed 50% profit.',
@@ -91,7 +87,6 @@ function getTooltip(key: string): string {
   };
   return tips[key] || 'No description available.';
 }
-
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
     super(props);
@@ -107,14 +102,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
     return this.props.children;
   }
 }
-
 function EditableField({ row, isBotConfig = false, isDescription = false, onSave }: { row: StrategyRow | BotConfigRow, isBotConfig?: boolean, isDescription?: boolean, onSave: (value: string) => void }) {
   const key = row.key;
   const rawValue = isDescription ? (row as BotConfigRow).description : row.value;
   const [localValue, setLocalValue] = useState(rawValue);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
-
   const validateInput = (value: string): string | null => {
     if (key === 'active_strategy') {
       if (!['trailing', 'simple'].includes(value.toLowerCase())) {
@@ -142,7 +135,6 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
     }
     return null;
   };
-
   const save = () => {
     const validationError = validateInput(localValue);
     if (validationError) {
@@ -153,7 +145,6 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
     setError(null);
     setDirty(false);
   };
-
   return (
     <div className="form-control">
       <input
@@ -182,13 +173,11 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
     </div>
   );
 }
-
 function EditableTakeProfit({ row, onSave }: { row: StrategyRow, onSave: (value: string) => void }) {
   const [localValue, setLocalValue] = useState(row.value);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const parsed = parseTakeProfit(localValue);
-
   const save = () => {
     try {
       JSON.parse(localValue);
@@ -199,7 +188,6 @@ function EditableTakeProfit({ row, onSave }: { row: StrategyRow, onSave: (value:
       setError('Invalid JSON format for profit levels');
     }
   };
-
   return (
     <div className="card bg-base-200 shadow-sm p-4">
       <div className="text-sm font-medium mb-2">Profit Levels</div>
@@ -284,7 +272,6 @@ function EditableTakeProfit({ row, onSave }: { row: StrategyRow, onSave: (value:
     </div>
   );
 }
-
 function WhaleRow({
   row,
   updateWhale,
@@ -298,7 +285,6 @@ function WhaleRow({
   const [localDescription, setLocalDescription] = useState(row.description);
   const [localActive, setLocalActive] = useState(row.active);
   const [error, setError] = useState<string | null>(null);
-
   const save = (field: 'address' | 'description' | 'active') => {
     if (field === 'address' && localAddress.length < 32) {
       setError('Wallet address must be a valid Solana address (at least 32 characters)');
@@ -311,7 +297,6 @@ function WhaleRow({
     });
     setError(null);
   };
-
   return (
     <tr>
       <td>
@@ -356,14 +341,12 @@ function WhaleRow({
     </tr>
   );
 }
-
 function BotConfigPage() {
   const queryClient = useQueryClient();
   const [activeStrategy, setActiveStrategy] = useState<string>('trailing');
   const [newWhaleAddress, setNewWhaleAddress] = useState('');
   const [newWhaleDescription, setNewWhaleDescription] = useState('');
   const [showBotConfigs, setShowBotConfigs] = useState(false);
-
   const { data: botConfigs, isLoading: botConfigsLoading } = useQuery<BotConfigRow[]>({
     queryKey: ['bot_configs'],
     queryFn: async () => {
@@ -372,7 +355,6 @@ function BotConfigPage() {
       return data;
     },
   });
-
   const { data: whaleWallets, isLoading: whaleWalletsLoading } = useQuery<WhaleRow[]>({
     queryKey: ['whale_wallets'],
     queryFn: async () => {
@@ -381,7 +363,6 @@ function BotConfigPage() {
       return data;
     },
   });
-
   const { data: strategyConfigsRaw, isLoading: strategyConfigsLoading } = useQuery<StrategyRow[]>({
     queryKey: ['strategy_configs'],
     queryFn: async () => {
@@ -390,14 +371,12 @@ function BotConfigPage() {
       return data;
     },
   });
-
   useEffect(() => {
     if (strategyConfigsRaw) {
       const active = strategyConfigsRaw.find((d) => d.key === 'active_strategy')?.value || 'trailing';
       setActiveStrategy(active);
     }
   }, [strategyConfigsRaw]);
-
   const updateBotConfig = useMutation({
     mutationFn: async ({ key, value, description }: { key: string; value: string; description: string }) => {
       const { error } = await supabase.from('bot_config').upsert({ key, value, description });
@@ -405,7 +384,6 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bot_configs'] }),
   });
-
   const updateWhale = useMutation({
     mutationFn: async ({ address, active, description }: { address: string; active: boolean; description: string }) => {
       const { error } = await supabase.from('whale_wallets').upsert({ address, active, description });
@@ -413,7 +391,6 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
   });
-
   const deleteWhale = useMutation({
     mutationFn: async (address: string) => {
       const { error } = await supabase.from('whale_wallets').delete().eq('address', address);
@@ -421,7 +398,6 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whale_wallets'] }),
   });
-
   const addWhale = useMutation({
     mutationFn: async ({ address, description }: { address: string; description: string }) => {
       if (address.length < 32) throw new Error('Invalid Solana address');
@@ -437,7 +413,6 @@ function BotConfigPage() {
       alert(`Failed to add wallet: ${error.message}`);
     },
   });
-
   const updateStrategyConfig = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
       const current = strategyConfigsRaw?.find((cfg) => cfg.key === key);
@@ -450,18 +425,15 @@ function BotConfigPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['strategy_configs'] }),
   });
-
   const strategyConfigs: StrategyRow[] = strategyConfigsRaw ?? [];
-  const activeKeys = strategyConfigs.filter((cfg) => 
-    cfg.key === 'active_strategy' || cfg.key.startsWith(activeStrategy === 'trailing' ? 'trailing_' : 'simple_')
+  const activeKeys = strategyConfigs.filter((cfg) =>
+    cfg.key.startsWith(activeStrategy === 'trailing' ? 'trailing_' : 'simple_')
   );
-
   const handleAddWhale = () => {
     if (newWhaleAddress) {
       addWhale.mutate({ address: newWhaleAddress, description: newWhaleDescription });
     }
   };
-
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8">
       <div className="flex items-center gap-3">
@@ -682,5 +654,4 @@ function BotConfigPage() {
     </div>
   );
 }
-
 export default BotConfigPage;
