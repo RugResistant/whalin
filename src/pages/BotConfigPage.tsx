@@ -74,9 +74,9 @@ function displayLabel(key: string): string {
 }
 function getTooltip(key: string): string {
   const tips: Record<string, string> = {
-    active_strategy: 'Choose how the bot decides when to sell tokens. "Trailing" adjusts the sell price dynamically as the token price rises, while "Simple" uses fixed profit and loss targets. Example: Trailing might sell after a 20% drop from a peak, while Simple sells at a fixed 50% profit.',
+    active_strategy: 'Choose how the bot decides when to sell tokens. "Trailing" strategy adjusts the sell price dynamically as the token price rises, while "Simple" uses fixed profit and loss targets. Example: Trailing might sell after a 20% drop from a peak, while Simple sells at a fixed 50% profit.',
     trailing_initial_stop_loss_ratio: 'If the token price drops by this percentage from your buy price, sell all tokens to limit losses. Example: Set to 25% (0.75) to sell if the price falls to 75% of what you paid.',
-    trailing_recover_initial_at_multiple: 'When the token price reaches this multiple of your buy price, sell just enough to recover your initial investment. Example: Set to 2 to sell a portion at 2x your buy price. Set to "null" to disable.',
+    trailing_recover_initial_at_multiple: 'When the token price reaches this multiple of your buy price, sell just enough to recover your initial investment. Example: Set to 2 to sell a portion at 2x your buy price. Enter "null" (without quotes) to disable this feature.',
     trailing_take_profit_levels: 'Sell a percentage of your tokens when the price reaches specified multiples of your buy price. Example: Sell 50% at 2x and 30% at 3x to lock in profits gradually.',
     trailing_activation_ratio: 'When the token price reaches this multiple of your buy price, the bot starts a trailing stop, which tracks the highest price and sells if it drops too far. Example: Set to 1.2 to start trailing at 20% profit.',
     trailing_cushion: 'After the trailing stop starts, sell all tokens if the price drops by this percentage from its highest point. Example: Set to 20% (0.2) to sell if the price falls 20% from the peak.',
@@ -109,6 +109,18 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const validateInput = (value: string): string | null => {
+    if (key === 'trailing_recover_initial_at_multiple') {
+      const trimmed = value.trim().toLowerCase();
+      if (trimmed === 'null') {
+        return null; // Valid
+      } else {
+        const num = parseFloat(value);
+        if (isNaN(num) || num <= 0) {
+          return 'Must be a positive number (e.g., 2 for 2x) or "null" to disable';
+        }
+        return null; // Valid number
+      }
+    }
     if (key === 'active_strategy') {
       if (!['trailing', 'simple'].includes(value.toLowerCase())) {
         return 'Must be "trailing" or "simple"';
@@ -148,12 +160,29 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
   return (
     <div className="form-control">
       <input
-        type={key.includes('percent') || key.includes('ratio') || key.includes('multiple') || key.includes('cushion') ? 'number' : 'text'}
-        step={key.includes('percent') ? '1' : '0.01'}
-        min={key.includes('percent') ? '0' : key.includes('stop_loss_ratio') ? '0' : key === 'active_strategy' ? undefined : '0'}
-        max={key.includes('percent') ? '100' : key.includes('cushion') ? '0.5' : undefined}
+        type={
+          key === 'trailing_recover_initial_at_multiple'
+            ? (localValue === 'null' ? 'text' : 'number')
+            : (key.includes('percent') || key.includes('ratio') || key.includes('multiple') || key.includes('cushion') ? 'number' : 'text')
+        }
+        step={
+          key === 'trailing_recover_initial_at_multiple' && localValue === 'null'
+            ? undefined
+            : (key.includes('percent') ? '1' : '0.01')
+        }
+        min={
+          key === 'trailing_recover_initial_at_multiple' && localValue === 'null'
+            ? undefined
+            : (key.includes('percent') ? '0' : key.includes('stop_loss_ratio') ? '0' : key === 'active_strategy' ? undefined : '0')
+        }
+        max={
+          key === 'trailing_recover_initial_at_multiple' && localValue === 'null'
+            ? undefined
+            : (key.includes('percent') ? '100' : key.includes('cushion') ? '0.5' : undefined)
+        }
         className={cn('input input-sm input-bordered w-48', error && 'input-error')}
         value={localValue}
+        disabled={key === 'trailing_recover_initial_at_multiple' && localValue === 'null'}
         onChange={(e) => {
           setLocalValue(e.target.value);
           setError(null);
@@ -166,10 +195,17 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
             setDirty(false);
           }
         }}
-        placeholder={key === 'active_strategy' ? 'trailing or simple' : undefined}
+        placeholder={key === 'active_strategy' ? 'trailing or simple' : (key === 'trailing_recover_initial_at_multiple' && localValue === 'null' ? 'Disabled' : 'Number or null')}
       />
       {error && <p className="text-xs text-error mt-1">{error}</p>}
       {dirty && <button className="btn btn-xs btn-success mt-1" onClick={save}><Save className="w-4 h-4" /> Save</button>}
+      {key === 'trailing_recover_initial_at_multiple' && (
+        localValue !== 'null' ? (
+          <button className="btn btn-xs btn-warning mt-1" onClick={() => { setLocalValue('null'); save(); }}>Disable Recovery</button>
+        ) : (
+          <button className="btn btn-xs btn-success mt-1" onClick={() => { setLocalValue('2'); save(); }}>Enable Recovery</button>
+        )
+      )}
     </div>
   );
 }
