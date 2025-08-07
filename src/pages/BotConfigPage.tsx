@@ -147,13 +147,14 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
     }
     return null;
   };
-  const save = () => {
-    const validationError = validateInput(localValue);
+  const save = (overrideValue?: string) => {
+    const valToUse = overrideValue ?? localValue;
+    const validationError = validateInput(valToUse);
     if (validationError) {
       setError(validationError);
       return;
     }
-    onSave(localValue);
+    onSave(valToUse);
     setError(null);
     setDirty(false);
   };
@@ -161,28 +162,27 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
     <div className="form-control">
       <input
         type={
-          key === 'trailing_recover_initial_at_multiple'
-            ? (localValue === 'null' ? 'text' : 'number')
+          key === 'trailing_recover_initial_at_multiple' 
+            ? 'text' 
             : (key.includes('percent') || key.includes('ratio') || key.includes('multiple') || key.includes('cushion') ? 'number' : 'text')
         }
         step={
-          key === 'trailing_recover_initial_at_multiple' && localValue === 'null'
-            ? undefined
+          key === 'trailing_recover_initial_at_multiple' 
+            ? undefined 
             : (key.includes('percent') ? '1' : '0.01')
         }
         min={
-          key === 'trailing_recover_initial_at_multiple' && localValue === 'null'
-            ? undefined
+          key === 'trailing_recover_initial_at_multiple' 
+            ? undefined 
             : (key.includes('percent') ? '0' : key.includes('stop_loss_ratio') ? '0' : key === 'active_strategy' ? undefined : '0')
         }
         max={
-          key === 'trailing_recover_initial_at_multiple' && localValue === 'null'
-            ? undefined
+          key === 'trailing_recover_initial_at_multiple' 
+            ? undefined 
             : (key.includes('percent') ? '100' : key.includes('cushion') ? '0.5' : undefined)
         }
         className={cn('input input-sm input-bordered w-48', error && 'input-error')}
         value={localValue}
-        disabled={key === 'trailing_recover_initial_at_multiple' && localValue === 'null'}
         onChange={(e) => {
           setLocalValue(e.target.value);
           setError(null);
@@ -195,16 +195,15 @@ function EditableField({ row, isBotConfig = false, isDescription = false, onSave
             setDirty(false);
           }
         }}
-        placeholder={key === 'active_strategy' ? 'trailing or simple' : (key === 'trailing_recover_initial_at_multiple' && localValue === 'null' ? 'Disabled' : 'Number or null')}
+        placeholder={key === 'active_strategy' ? 'trailing or simple' : key === 'trailing_recover_initial_at_multiple' ? 'Number or null' : undefined}
       />
       {error && <p className="text-xs text-error mt-1">{error}</p>}
-      {dirty && <button className="btn btn-xs btn-success mt-1" onClick={save}><Save className="w-4 h-4" /> Save</button>}
-      {key === 'trailing_recover_initial_at_multiple' && (
-        localValue !== 'null' ? (
-          <button className="btn btn-xs btn-warning mt-1" onClick={() => { setLocalValue('null'); save(); }}>Disable Recovery</button>
-        ) : (
-          <button className="btn btn-xs btn-success mt-1" onClick={() => { setLocalValue('2'); save(); }}>Enable Recovery</button>
-        )
+      {dirty && <button className="btn btn-xs btn-success mt-1" onClick={() => save()}><Save className="w-4 h-4" /> Save</button>}
+      {key === 'trailing_recover_initial_at_multiple' && localValue !== 'null' && (
+        <button className="btn btn-xs btn-warning mt-1" onClick={() => { setLocalValue('null'); save('null'); }}>Disable Recovery</button>
+      )}
+      {key === 'trailing_recover_initial_at_multiple' && localValue === 'null' && (
+        <button className="btn btn-xs btn-success mt-1" onClick={() => { setLocalValue('2'); save('2'); }}>Enable Recovery</button>
       )}
     </div>
   );
